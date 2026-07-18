@@ -1,0 +1,16 @@
+Instrument sample attribution
+=============================
+
+Sample collection: tonejs-instruments by Noah Brosowsky
+Project: https://nbrosowsky.github.io/tonejs-instruments/
+License: Creative Commons Attribution 3.0 (CC BY 3.0)
+License text: https://creativecommons.org/licenses/by/3.0/
+
+Original sample sources credited by tonejs-instruments:
+
+- Violin: Versilian Studios Chamber Orchestra 2 Community Edition (VSO2)
+- Acoustic guitar: University of Iowa Electronic Music Studios
+- Saxophone: Karoryfer Samples
+
+This project uses a pitch-spread subset of the MP3 samples and preserves
+attribution in both this file and the public interface.
