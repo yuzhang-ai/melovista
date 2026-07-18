@@ -93,7 +93,8 @@ const ALL_KEYS = [...LOW_KEYS, ...MID_KEYS, ...HIGH_KEYS];
 const KEY_BY_CODE = new Map(ALL_KEYS.map((key) => [key.code, key]));
 const NOTE_NAMES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
 const SHORT_RELEASE_SECONDS = 0.12;
-const LONG_RELEASE_SECONDS = 3;
+const LONG_RELEASE_TIME_CONSTANT_SECONDS = 1.8;
+const LONG_RELEASE_STOP_SECONDS = 9;
 
 const SAMPLE_BANKS: Record<SampleBankKey, SampleBank> = {
   acoustic: {
@@ -269,12 +270,18 @@ export default function Home() {
     const voice = voicesRef.current.get(code);
     if (!context || !voice) return;
 
-    const releaseSeconds = forcedRelease ?? (articulationRef.current === "long" ? LONG_RELEASE_SECONDS : SHORT_RELEASE_SECONDS);
+    const isNaturalLongRelease = forcedRelease === undefined && articulationRef.current === "long";
+    const releaseSeconds = forcedRelease ?? SHORT_RELEASE_SECONDS;
     const now = context.currentTime;
     voice.gain.gain.cancelScheduledValues(now);
     voice.gain.gain.setValueAtTime(Math.max(voice.gain.gain.value, 0.0001), now);
-    voice.gain.gain.exponentialRampToValueAtTime(0.0001, now + releaseSeconds);
-    voice.source.stop(now + releaseSeconds + 0.05);
+    if (isNaturalLongRelease) {
+      voice.gain.gain.setTargetAtTime(0.0001, now, LONG_RELEASE_TIME_CONSTANT_SECONDS);
+      voice.source.stop(now + LONG_RELEASE_STOP_SECONDS);
+    } else {
+      voice.gain.gain.exponentialRampToValueAtTime(0.0001, now + releaseSeconds);
+      voice.source.stop(now + releaseSeconds + 0.05);
+    }
     voicesRef.current.delete(code);
   }, []);
 
@@ -645,7 +652,7 @@ export default function Home() {
             <strong data-testid="articulation-mode">{articulation === "long" ? "长音模式" : "短音模式"}</strong>
           </div>
           <kbd>LEFT ALT</kbd>
-          <p>{articulation === "long" ? "松键后自然延音约 3 秒" : "松键后快速收音，适合颗粒感节奏"}</p>
+          <p>{articulation === "long" ? "松键后缓慢衰减，尾音可自然延续约 6—9 秒" : "松键后快速收音，适合颗粒感节奏"}</p>
         </button>
       </footer>
 

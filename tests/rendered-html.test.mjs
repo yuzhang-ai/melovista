@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function render() {
@@ -34,4 +35,11 @@ test("server-renders the immersive three-octave piano", async () => {
   assert.match(html, /Salamander Grand Piano V3/);
   assert.match(html, /tonejs-instruments/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
+});
+
+test("long articulation uses a slow natural release envelope", async () => {
+  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(source, /LONG_RELEASE_TIME_CONSTANT_SECONDS = 1\.8/);
+  assert.match(source, /LONG_RELEASE_STOP_SECONDS = 9/);
+  assert.match(source, /setTargetAtTime\(0\.0001, now, LONG_RELEASE_TIME_CONSTANT_SECONDS\)/);
 });
