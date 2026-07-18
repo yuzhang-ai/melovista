@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "三八度键盘钢琴 · 延迟实验室",
-  description: "使用电脑键盘验证三八度虚拟钢琴的低延迟交互。",
+  title: "三八度真实钢琴 · 延迟实验室",
+  description: "使用电脑键盘弹奏三八度真实钢琴采样，支持短音与长音切换。",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

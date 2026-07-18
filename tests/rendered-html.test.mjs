@@ -19,11 +19,14 @@ test("server-renders the three-octave latency lab", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>三八度键盘钢琴 · 延迟实验室<\/title>/i);
+  assert.match(html, /<title>三八度真实钢琴 · 延迟实验室<\/title>/i);
   assert.match(html, /三八度键盘钢琴/);
-  assert.match(html, /点击启动音频/);
+  assert.match(html, /加载并启动真实钢琴/);
   assert.match(html, /aria-label="高音区 C5 到 B5"/);
   assert.match(html, /aria-label="中音区 C4 到 B4"/);
   assert.match(html, /aria-label="可切换低音区 C3 到 B3"/);
+  assert.match(html, /LEFT ALT/);
+  assert.match(html, /短音模式/);
+  assert.match(html, /Salamander Grand Piano V3/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });

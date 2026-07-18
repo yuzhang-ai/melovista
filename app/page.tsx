@@ -10,8 +10,11 @@ type KeyDefinition = {
   group: "low" | "mid" | "high";
 };
 
+type Articulation = "short" | "long";
+type AudioStatus = "idle" | "starting" | "loading" | "running" | "suspended" | "error";
+
 type Voice = {
-  oscillators: OscillatorNode[];
+  source: AudioBufferSourceNode;
   gain: GainNode;
 };
 
@@ -19,6 +22,11 @@ type AudioDiagnostics = {
   baseLatency: number;
   outputLatency: number | null;
   sampleRate: number;
+};
+
+type SampleDefinition = {
+  midi: number;
+  file: string;
 };
 
 const MID_KEYS: KeyDefinition[] = [
@@ -69,10 +77,27 @@ const LOW_KEYS: KeyDefinition[] = [
 const ALL_KEYS = [...LOW_KEYS, ...MID_KEYS, ...HIGH_KEYS];
 const KEY_BY_CODE = new Map(ALL_KEYS.map((key) => [key.code, key]));
 const NOTE_NAMES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
+const SHORT_RELEASE_SECONDS = 0.12;
+const LONG_RELEASE_SECONDS = 3;
 
-function midiToFrequency(midi: number) {
-  return 440 * 2 ** ((midi - 69) / 12);
-}
+const PIANO_SAMPLES: SampleDefinition[] = [
+  { midi: 36, file: "C2.mp3" },
+  { midi: 39, file: "Ds2.mp3" },
+  { midi: 42, file: "Fs2.mp3" },
+  { midi: 45, file: "A2.mp3" },
+  { midi: 48, file: "C3.mp3" },
+  { midi: 51, file: "Ds3.mp3" },
+  { midi: 54, file: "Fs3.mp3" },
+  { midi: 57, file: "A3.mp3" },
+  { midi: 60, file: "C4.mp3" },
+  { midi: 63, file: "Ds4.mp3" },
+  { midi: 66, file: "Fs4.mp3" },
+  { midi: 69, file: "A4.mp3" },
+  { midi: 72, file: "C5.mp3" },
+  { midi: 75, file: "Ds5.mp3" },
+  { midi: 78, file: "Fs5.mp3" },
+  { midi: 81, file: "A5.mp3" },
+];
 
 function keyToMidi(key: KeyDefinition, lowOctave: 2 | 3) {
   const octave = key.group === "low" ? lowOctave : key.group === "mid" ? 4 : 5;
@@ -88,6 +113,34 @@ function percentile95(values: number[]) {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1)];
+}
+
+async function loadPianoSamples(context: AudioContext, onProgress: (loaded: number) => void) {
+  let loaded = 0;
+  const decoded = await Promise.all(
+    PIANO_SAMPLES.map(async (sample) => {
+      const response = await fetch(`/audio/piano/${sample.file}`, { cache: "force-cache" });
+      if (!response.ok) throw new Error(`Unable to load ${sample.file}`);
+      const buffer = await context.decodeAudioData(await response.arrayBuffer());
+      loaded += 1;
+      onProgress(loaded);
+      return [sample.midi, buffer] as const;
+    }),
+  );
+  return new Map<number, AudioBuffer>(decoded);
+}
+
+function nearestSample(midi: number, buffers: Map<number, AudioBuffer>) {
+  let nearest = PIANO_SAMPLES[0];
+  for (const sample of PIANO_SAMPLES) {
+    if (Math.abs(sample.midi - midi) < Math.abs(nearest.midi - midi)) nearest = sample;
+  }
+  const buffer = buffers.get(nearest.midi);
+  if (!buffer) return null;
+  return {
+    buffer,
+    playbackRate: 2 ** ((midi - nearest.midi) / 12),
+  };
 }
 
 function KeyStrip({
@@ -136,38 +189,50 @@ function KeyStrip({
 export default function Home() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
+  const sampleBuffersRef = useRef(new Map<number, AudioBuffer>());
   const voicesRef = useRef(new Map<string, Voice>());
   const activeCodesRef = useRef(new Set<string>());
   const lowOctaveRef = useRef<2 | 3>(3);
+  const articulationRef = useRef<Articulation>("short");
   const measurementsRef = useRef<number[]>([]);
 
   const [isAudioReady, setIsAudioReady] = useState(false);
-  const [audioStatus, setAudioStatus] = useState<"idle" | "starting" | "running" | "suspended">("idle");
+  const [audioStatus, setAudioStatus] = useState<AudioStatus>("idle");
+  const [sampleProgress, setSampleProgress] = useState(0);
   const [lowOctave, setLowOctave] = useState<2 | 3>(3);
+  const [articulation, setArticulation] = useState<Articulation>("short");
   const [activeCodes, setActiveCodes] = useState<Set<string>>(new Set());
-  const [lastNote, setLastNote] = useState("等待按键");
+  const [lastNote, setLastNote] = useState("等待加载钢琴音源");
   const [lastScheduleMs, setLastScheduleMs] = useState(0);
   const [p95ScheduleMs, setP95ScheduleMs] = useState(0);
   const [diagnostics, setDiagnostics] = useState<AudioDiagnostics | null>(null);
 
-  const releaseVoice = useCallback((code: string) => {
+  const releaseVoice = useCallback((code: string, forcedRelease?: number) => {
     const context = audioContextRef.current;
     const voice = voicesRef.current.get(code);
     if (!context || !voice) return;
 
+    const releaseSeconds = forcedRelease ?? (articulationRef.current === "long" ? LONG_RELEASE_SECONDS : SHORT_RELEASE_SECONDS);
     const now = context.currentTime;
     voice.gain.gain.cancelScheduledValues(now);
     voice.gain.gain.setValueAtTime(Math.max(voice.gain.gain.value, 0.0001), now);
-    voice.gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
-    voice.oscillators.forEach((oscillator) => oscillator.stop(now + 0.2));
+    voice.gain.gain.exponentialRampToValueAtTime(0.0001, now + releaseSeconds);
+    voice.source.stop(now + releaseSeconds + 0.05);
     voicesRef.current.delete(code);
   }, []);
 
-  const releaseAll = useCallback(() => {
-    [...voicesRef.current.keys()].forEach(releaseVoice);
+  const releaseAll = useCallback((releaseSeconds = 0.08) => {
+    [...voicesRef.current.keys()].forEach((code) => releaseVoice(code, releaseSeconds));
     activeCodesRef.current.clear();
     setActiveCodes(new Set());
   }, [releaseVoice]);
+
+  const toggleArticulation = useCallback(() => {
+    const next = articulationRef.current === "short" ? "long" : "short";
+    articulationRef.current = next;
+    setArticulation(next);
+    setLastNote(`已切换到${next === "long" ? "长音" : "短音"}模式`);
+  }, []);
 
   const startVoice = useCallback((code: string, key: KeyDefinition, eventStartedAt: number) => {
     const context = audioContextRef.current;
@@ -175,40 +240,25 @@ export default function Home() {
     if (!context || !master || context.state !== "running") return false;
 
     const midi = keyToMidi(key, lowOctaveRef.current);
-    const frequency = midiToFrequency(midi);
+    const sample = nearestSample(midi, sampleBuffersRef.current);
+    if (!sample) return false;
+
     const now = context.currentTime;
+    const source = context.createBufferSource();
     const gain = context.createGain();
-    const filter = context.createBiquadFilter();
-    const oscillators: OscillatorNode[] = [];
-
-    filter.type = "lowpass";
-    filter.frequency.setValueAtTime(Math.min(7200, frequency * 11), now);
-    filter.Q.setValueAtTime(0.7, now);
-
+    source.buffer = sample.buffer;
+    source.playbackRate.setValueAtTime(sample.playbackRate, now);
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.32, now + 0.004);
-    gain.gain.exponentialRampToValueAtTime(0.11, now + 0.14);
-    gain.gain.exponentialRampToValueAtTime(0.025, now + 1.8);
-    gain.connect(filter);
-    filter.connect(master);
+    gain.gain.exponentialRampToValueAtTime(0.82, now + 0.003);
+    source.connect(gain);
+    gain.connect(master);
+    source.start(now);
 
-    ([
-      { ratio: 1, type: "triangle" as OscillatorType, level: 1 },
-      { ratio: 2, type: "sine" as OscillatorType, level: 0.22 },
-      { ratio: 3, type: "sine" as OscillatorType, level: 0.08 },
-    ]).forEach(({ ratio, type, level }) => {
-      const oscillator = context.createOscillator();
-      const partialGain = context.createGain();
-      oscillator.type = type;
-      oscillator.frequency.setValueAtTime(frequency * ratio, now);
-      partialGain.gain.setValueAtTime(level, now);
-      oscillator.connect(partialGain);
-      partialGain.connect(gain);
-      oscillator.start(now);
-      oscillators.push(oscillator);
-    });
-
-    voicesRef.current.set(code, { oscillators, gain });
+    const voice = { source, gain };
+    voicesRef.current.set(code, voice);
+    source.onended = () => {
+      if (voicesRef.current.get(code) === voice) voicesRef.current.delete(code);
+    };
 
     const scheduledMs = performance.now() - eventStartedAt;
     const measurements = measurementsRef.current;
@@ -217,7 +267,7 @@ export default function Home() {
 
     setLastScheduleMs(scheduledMs);
     setP95ScheduleMs(percentile95(measurements));
-    setLastNote(`${keyToNote(key, lowOctaveRef.current)} · ${key.label}`);
+    setLastNote(`${keyToNote(key, lowOctaveRef.current)} · ${key.label} · ${articulationRef.current === "long" ? "长音" : "短音"}`);
     return true;
   }, []);
 
@@ -228,28 +278,43 @@ export default function Home() {
       context = new AudioContext({ latencyHint: "interactive" });
       const masterGain = context.createGain();
       const compressor = context.createDynamicsCompressor();
-      masterGain.gain.value = 0.55;
-      compressor.threshold.value = -10;
-      compressor.knee.value = 10;
-      compressor.ratio.value = 8;
-      compressor.attack.value = 0.003;
+      masterGain.gain.value = 0.72;
+      compressor.threshold.value = -8;
+      compressor.knee.value = 8;
+      compressor.ratio.value = 5;
+      compressor.attack.value = 0.002;
       compressor.release.value = 0.18;
       masterGain.connect(compressor);
       compressor.connect(context.destination);
       audioContextRef.current = context;
       masterGainRef.current = masterGain;
       context.addEventListener("statechange", () => {
+        const samplesReady = sampleBuffersRef.current.size === PIANO_SAMPLES.length;
+        if (!samplesReady) return;
         const running = context?.state === "running";
         setIsAudioReady(running);
         setAudioStatus(running ? "running" : "suspended");
       });
     }
 
-    const resumeAttempt = context.resume().catch(() => undefined);
     await Promise.race([
-      resumeAttempt,
+      context.resume().catch(() => undefined),
       new Promise<void>((resolve) => window.setTimeout(resolve, 600)),
     ]);
+
+    if (sampleBuffersRef.current.size !== PIANO_SAMPLES.length) {
+      setAudioStatus("loading");
+      setSampleProgress(0);
+      try {
+        sampleBuffersRef.current = await loadPianoSamples(context, setSampleProgress);
+      } catch {
+        setAudioStatus("error");
+        setIsAudioReady(false);
+        setLastNote("钢琴音源加载失败，请检查网络后重试");
+        return;
+      }
+    }
+
     const contextWithOutput = context as AudioContext & { outputLatency?: number };
     setDiagnostics({
       baseLatency: context.baseLatency,
@@ -259,6 +324,7 @@ export default function Home() {
     const running = context.state === "running";
     setIsAudioReady(running);
     setAudioStatus(running ? "running" : "suspended");
+    setLastNote(running ? "真实钢琴已就绪，可以弹奏" : "音源已加载，请再次点击启动音频");
   }, []);
 
   useEffect(() => {
@@ -266,12 +332,17 @@ export default function Home() {
       const target = event.target as HTMLElement | null;
       if (target?.matches("input, textarea, select, [contenteditable='true']")) return;
 
+      if (event.code === "AltLeft") {
+        event.preventDefault();
+        if (!event.repeat) toggleArticulation();
+        return;
+      }
+
       if (event.code === "Space") {
         event.preventDefault();
         if (event.repeat) return;
-
         LOW_KEYS.forEach((key) => {
-          releaseVoice(key.code);
+          releaseVoice(key.code, 0.08);
           activeCodesRef.current.delete(key.code);
         });
         const nextOctave = lowOctaveRef.current === 3 ? 2 : 3;
@@ -284,23 +355,21 @@ export default function Home() {
 
       const key = KEY_BY_CODE.get(event.code);
       if (!key) return;
-
       event.preventDefault();
       if (event.repeat || activeCodesRef.current.has(event.code)) return;
 
       const eventStartedAt = performance.now();
       activeCodesRef.current.add(event.code);
       const started = startVoice(event.code, key, eventStartedAt);
-      if (!started) setLastNote(`${keyToNote(key, lowOctaveRef.current)} · ${key.label}（音频未运行）`);
+      if (!started) setLastNote(`${keyToNote(key, lowOctaveRef.current)} · 请先加载并启动钢琴音源`);
       setActiveCodes(new Set(activeCodesRef.current));
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
-      if (event.code === "Space") {
+      if (event.code === "Space" || event.code === "AltLeft") {
         event.preventDefault();
         return;
       }
-
       if (!KEY_BY_CODE.has(event.code)) return;
       event.preventDefault();
       releaseVoice(event.code);
@@ -309,36 +378,48 @@ export default function Home() {
     };
 
     const onVisibilityChange = () => {
-      if (document.hidden) releaseAll();
+      if (document.hidden) releaseAll(0.08);
     };
+    const onBlur = () => releaseAll(0.08);
 
     window.addEventListener("keydown", onKeyDown, { capture: true });
     window.addEventListener("keyup", onKeyUp, { capture: true });
-    window.addEventListener("blur", releaseAll);
+    window.addEventListener("blur", onBlur);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       window.removeEventListener("keydown", onKeyDown, { capture: true });
       window.removeEventListener("keyup", onKeyUp, { capture: true });
-      window.removeEventListener("blur", releaseAll);
+      window.removeEventListener("blur", onBlur);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      releaseAll();
+      releaseAll(0.05);
     };
-  }, [releaseAll, releaseVoice, startVoice]);
+  }, [releaseAll, releaseVoice, startVoice, toggleArticulation]);
 
   const activeCodeSet = useMemo(() => activeCodes, [activeCodes]);
+  const audioButtonText = audioStatus === "running"
+    ? "真实钢琴已就绪"
+    : audioStatus === "loading"
+      ? `正在加载钢琴音源 ${sampleProgress}/${PIANO_SAMPLES.length}`
+      : audioStatus === "starting"
+        ? "正在启动音频…"
+        : audioStatus === "suspended"
+          ? "音频已暂停，点击恢复"
+          : audioStatus === "error"
+            ? "加载失败，点击重试"
+            : "加载并启动真实钢琴";
 
   return (
     <main className="app-shell">
       <header className="hero">
         <div>
-          <div className="brand-line"><span className="status-dot" /> LATENCY LAB · P0</div>
+          <div className="brand-line"><span className="status-dot" /> REAL SAMPLE ENGINE · P1</div>
           <h1>三八度键盘钢琴</h1>
-          <p>先验证手感。声音在键盘事件到达后立即调度，暂不加载气泡动画。</p>
+          <p>真实 Yamaha C5 钢琴采样已接入；音源加载后全部驻留内存，按键仍然立即调度。</p>
         </div>
-        <button className={`audio-button ${isAudioReady ? "ready" : ""}`} onClick={initializeAudio} data-testid="start-audio">
-          <span>{audioStatus === "running" ? "音频已启动" : audioStatus === "starting" ? "正在启动音频…" : audioStatus === "suspended" ? "音频仍被浏览器暂停" : "点击启动音频"}</span>
-          <small>{audioStatus === "running" ? "现在可以直接弹奏" : audioStatus === "suspended" ? "请在实际 Chrome / Edge 中再点一次" : "浏览器要求先进行一次点击"}</small>
+        <button className={`audio-button ${isAudioReady ? "ready" : ""}`} onClick={initializeAudio} disabled={audioStatus === "loading"} data-testid="start-audio">
+          <span>{audioButtonText}</span>
+          <small>{audioStatus === "running" ? `当前：${articulation === "long" ? "长音" : "短音"}模式` : "首次约加载 1.2MB，浏览器缓存后更快"}</small>
         </button>
       </header>
 
@@ -361,7 +442,7 @@ export default function Home() {
         </div>
       </section>
 
-      <p className="measurement-note">提示：JS 调度耗时用于验证代码热路径，不等于扬声器最终出声的端到端延迟；蓝牙设备会额外增加硬件延迟。</p>
+      <p className="measurement-note">演奏过程中不会请求网络。建议继续使用内置扬声器或有线耳机；蓝牙设备仍会额外增加硬件延迟。</p>
 
       <div className="keyboard-map">
         <KeyStrip title="高音区" octave={5} keys={HIGH_KEYS} activeCodes={activeCodeSet} />
@@ -369,14 +450,28 @@ export default function Home() {
         <KeyStrip title="可切换低音区" octave={lowOctave} keys={LOW_KEYS} activeCodes={activeCodeSet} />
       </div>
 
-      <footer className="octave-switch">
-        <div>
-          <span className="eyebrow">低音区切换</span>
-          <strong>C{lowOctave} — B{lowOctave}</strong>
-        </div>
-        <kbd>SPACE</kbd>
-        <p>每按一次空格，在 C3 与 C2 之间切换</p>
+      <footer className="performance-controls">
+        <section className="control-card">
+          <div>
+            <span className="eyebrow">低音区切换</span>
+            <strong>C{lowOctave} — B{lowOctave}</strong>
+          </div>
+          <kbd>SPACE</kbd>
+          <p>每按一次，在 C3 与 C2 之间切换</p>
+        </section>
+        <button className={`control-card articulation ${articulation}`} type="button" onClick={toggleArticulation} data-testid="articulation-toggle">
+          <div>
+            <span className="eyebrow">发音长度</span>
+            <strong data-testid="articulation-mode">{articulation === "long" ? "长音模式" : "短音模式"}</strong>
+          </div>
+          <kbd>LEFT ALT</kbd>
+          <p>{articulation === "long" ? "松键后自然延音约 3 秒" : "松键后快速收音，适合颗粒感节奏"}</p>
+        </button>
       </footer>
+
+      <p className="sample-credit">
+        Piano samples: <a href="https://github.com/sfzinstruments/SalamanderGrandPiano" target="_blank" rel="noreferrer">Salamander Grand Piano V3</a> by Alexander Holm · CC BY 3.0
+      </p>
     </main>
   );
 }

@@ -50,6 +50,7 @@ button, kbd { font: inherit; }
 .audio-button span { font-weight: 800; font-size: 15px; }
 .audio-button small { margin-top: 3px; opacity: 0.68; font-size: 11px; }
 .audio-button.ready { background: linear-gradient(135deg, var(--green), #78ddcf); }
+.audio-button:disabled { cursor: wait; opacity: 0.82; }
 
 .diagnostics { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--panel); backdrop-filter: blur(16px); }
 .metric { min-height: 112px; padding: 20px; border-right: 1px solid var(--line); }
@@ -78,10 +79,18 @@ button, kbd { font: inherit; }
 .key-chip.active { z-index: 1; transform: translateY(2px) scale(0.98); color: #001217; border-color: var(--cyan); background: var(--cyan); box-shadow: 0 0 24px rgba(82, 229, 255, 0.48); }
 .key-chip.active span { color: #185361; }
 
-.octave-switch { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 22px; margin-top: 18px; padding: 18px 22px; border: 1px dashed rgba(82, 229, 255, 0.3); border-radius: 16px; background: rgba(82, 229, 255, 0.04); }
-.octave-switch strong { display: block; margin-top: 4px; font-family: var(--font-geist-mono), monospace; font-size: 18px; }
-.octave-switch kbd { padding: 11px 36px; color: #041319; font-family: var(--font-geist-mono), monospace; font-size: 13px; font-weight: 800; border-radius: 8px; background: var(--cyan); box-shadow: 0 6px 0 #238aa0; }
-.octave-switch p { margin: 0; color: var(--muted); font-size: 12px; text-align: right; }
+.performance-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
+.control-card { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px 22px; padding: 18px 22px; color: var(--ink); text-align: left; border: 1px dashed rgba(82, 229, 255, 0.3); border-radius: 16px; background: rgba(82, 229, 255, 0.04); }
+button.control-card { width: 100%; font: inherit; cursor: pointer; }
+.control-card strong { display: block; margin-top: 4px; font-family: var(--font-geist-mono), monospace; font-size: 18px; }
+.control-card kbd { padding: 11px 24px; color: #041319; font-family: var(--font-geist-mono), monospace; font-size: 12px; font-weight: 800; border-radius: 8px; background: var(--cyan); box-shadow: 0 6px 0 #238aa0; }
+.control-card p { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 12px; }
+.control-card.articulation { border-color: rgba(139, 124, 255, 0.42); background: rgba(139, 124, 255, 0.06); transition: border-color 120ms ease, background 120ms ease; }
+.control-card.articulation kbd { color: #0c0822; background: #a99cff; box-shadow: 0 6px 0 #5c4fd0; }
+.control-card.articulation.long { border-color: rgba(110, 240, 169, 0.48); background: rgba(110, 240, 169, 0.07); }
+.control-card.articulation.long .eyebrow { color: var(--green); }
+.sample-credit { margin: 24px 2px 0; color: #68738d; font-size: 10px; text-align: center; }
+.sample-credit a { color: #91a0c4; text-underline-offset: 3px; }
 
 @media (max-width: 820px) {
   .app-shell { width: min(100% - 20px, 680px); padding-top: 28px; }
@@ -93,6 +102,5 @@ button, kbd { font: inherit; }
   .key-row { overflow-x: auto; }
   .key-row.naturals { grid-template-columns: repeat(7, 74px); }
   .key-row.accidentals { grid-template-columns: repeat(5, 74px); width: max-content; margin-left: 0; }
-  .octave-switch { grid-template-columns: 1fr auto; }
-  .octave-switch p { grid-column: 1 / -1; text-align: left; }
+  .performance-controls { grid-template-columns: 1fr; }
 }

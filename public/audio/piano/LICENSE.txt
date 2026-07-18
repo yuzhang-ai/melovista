@@ -1,0 +1,9 @@
+Salamander Grand Piano V3
+
+Original author: Alexander Holm
+Source: https://github.com/sfzinstruments/SalamanderGrandPiano
+License: Creative Commons Attribution 3.0 Unported (CC BY 3.0)
+License text: https://creativecommons.org/licenses/by/3.0/
+
+This directory contains a compressed subset of the original samples covering
+the C2-B5 range. The samples are distributed with attribution under CC BY 3.0.
