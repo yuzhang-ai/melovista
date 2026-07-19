@@ -102,6 +102,7 @@ const LOW_KEYS: KeyDefinition[] = [
 
 const ALL_KEYS = [...LOW_KEYS, ...MID_KEYS, ...HIGH_KEYS];
 const KEY_BY_CODE = new Map(ALL_KEYS.map((key) => [key.code, key]));
+const IMMERSIVE_CONTROL_CODES = new Set(["Space", "AltLeft"]);
 const NOTE_NAMES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
 const SHORT_RELEASE_TIME_CONSTANT_SECONDS = 0.72;
 const SHORT_RELEASE_STOP_SECONDS = 3;
@@ -505,7 +506,7 @@ export default function Home() {
     releaseAll(0.06);
     immersiveModeRef.current = true;
     setImmersiveMode(true);
-    setLastNote("沉浸模式已开启：仅 36 个琴键映射响应");
+    setLastNote("沉浸模式已开启：仅琴键与演奏控制响应");
 
     try {
       await document.documentElement.requestFullscreen({
@@ -535,19 +536,19 @@ export default function Home() {
       if (immersiveModeRef.current) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        if (!KEY_BY_CODE.has(event.code)) return;
+        if (!KEY_BY_CODE.has(event.code) && !IMMERSIVE_CONTROL_CODES.has(event.code)) return;
       }
 
       const target = event.target as HTMLElement | null;
       if (!immersiveModeRef.current && target?.matches("input, textarea, select, [contenteditable='true']")) return;
 
-      if (!immersiveModeRef.current && event.code === "AltLeft") {
+      if (event.code === "AltLeft") {
         event.preventDefault();
         if (!event.repeat) toggleArticulation();
         return;
       }
 
-      if (!immersiveModeRef.current && event.code === "Space") {
+      if (event.code === "Space") {
         event.preventDefault();
         if (event.repeat) return;
         LOW_KEYS.forEach((key) => {
@@ -578,10 +579,10 @@ export default function Home() {
       if (immersiveModeRef.current) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        if (!KEY_BY_CODE.has(event.code)) return;
+        if (!KEY_BY_CODE.has(event.code) && !IMMERSIVE_CONTROL_CODES.has(event.code)) return;
       }
 
-      if (!immersiveModeRef.current && (event.code === "Space" || event.code === "AltLeft")) {
+      if (event.code === "Space" || event.code === "AltLeft") {
         event.preventDefault();
         return;
       }
@@ -712,14 +713,14 @@ export default function Home() {
               data-testid="immersive-toggle"
             >
               <span>{immersiveMode ? "退出沉浸模式" : "进入沉浸模式"}</span>
-              <small>{immersiveMode ? "仅琴键响应" : "屏蔽非琴键误触"}</small>
+              <small>{immersiveMode ? "琴键与控制响应" : "屏蔽无关按键误触"}</small>
             </button>
           </div>
         </div>
         {immersiveMode && (
           <div className="immersive-notice" role="status">
             <strong>沉浸模式已开启</strong>
-            <span>仅 36 个琴键映射可以发声，Space、左 Alt 与其他按键均已停用；请点击上方按钮退出。</span>
+            <span>36 个琴键、Space 音区切换和左 Alt 长短音切换保持可用，其他按键均已停用；请点击上方按钮退出。</span>
           </div>
         )}
         <div className="instrument-scroll">

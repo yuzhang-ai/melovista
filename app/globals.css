@@ -172,7 +172,6 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 .immersive-notice { display: flex; align-items: center; gap: 12px; padding: 10px 21px; color: #dffcff; border-bottom: 1px solid rgba(121, 243, 189, 0.2); background: linear-gradient(90deg, rgba(36, 151, 133, 0.24), rgba(23, 87, 122, 0.16)); }
 .immersive-notice strong { flex: none; color: var(--green); font-size: 11px; }
 .immersive-notice span { color: #8fb5c1; font-size: 9px; }
-.app-shell.immersive .performance-controls { opacity: 0.42; pointer-events: none; filter: saturate(0.55); }
 .app-shell.immersive .instrument-panel { border-color: rgba(121, 243, 189, 0.4); box-shadow: 0 28px 80px rgba(0, 0, 0, 0.32), 0 0 54px rgba(121, 243, 189, 0.08); }
 .instrument-scroll { overflow-x: auto; scrollbar-color: rgba(93, 234, 255, 0.25) transparent; }
 
