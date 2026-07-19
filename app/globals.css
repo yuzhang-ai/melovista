@@ -164,6 +164,9 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
 .dock-item b, .dock-button b, .dock-item span { font-size: 10px; font-weight: 660; white-space: nowrap; }
 .scene-item { min-width: 126px; }
 .timbre-button { min-width: 126px; }
+.language-button { min-width: 88px; }
+.language-icon { font: 700 13px/1 Georgia, "Times New Roman", serif; }
+.app-shell[data-locale="en"] .brand-lockup p { letter-spacing: 0.12em; }
 .dock-menu-wrap { position: relative; display: flex; }
 .dock-chevron { margin-left: auto; color: rgba(255, 255, 255, 0.55); font: normal 12px/1 Georgia, serif; transition: transform 150ms ease; }
 .dock-button[aria-expanded="true"] .dock-chevron { transform: rotate(180deg); }

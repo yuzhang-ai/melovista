@@ -13,6 +13,7 @@ type KeyDefinition = {
 type Articulation = "short" | "long";
 type Timbre = "acoustic" | "bright" | "violin" | "guitar" | "saxophone";
 type SceneId = "coast" | "forest" | "rain" | "stars";
+type Locale = "zh" | "en";
 type OpenMenu = "scene" | "timbre" | null;
 type SampleBankKey = Exclude<Timbre, "bright">;
 type AudioStatus = "idle" | "starting" | "loading" | "running" | "suspended" | "error";
@@ -40,16 +41,16 @@ type SampleBank = {
 
 type TimbreOption = {
   id: Timbre;
-  label: string;
-  detail: string;
+  label: Record<Locale, string>;
+  detail: Record<Locale, string>;
   bank: SampleBankKey;
   gain: number;
 };
 
 type SceneOption = {
   id: SceneId;
-  label: string;
-  detail: string;
+  label: Record<Locale, string>;
+  detail: Record<Locale, string>;
   icon: string;
   image: string;
   video: string;
@@ -136,6 +137,109 @@ const SHORT_RELEASE_STOP_SECONDS = 3;
 const LONG_RELEASE_TIME_CONSTANT_SECONDS = 1.8;
 const LONG_RELEASE_STOP_SECONDS = 9;
 
+const UI_COPY = {
+  zh: {
+    brand: "乐境 MeloVista",
+    tagline: "四景 · 六音区沉浸式琴房",
+    documentTitle: "乐境 MeloVista · 沉浸式六音区钢琴",
+    language: "语言",
+    languageName: "中文",
+    switchLanguage: "切换至英文界面",
+    scene: "场景",
+    chooseScene: "选择场景",
+    chooseWindow: "选择一扇窗",
+    timbre: "音色",
+    chooseTimbre: "选择音色",
+    chooseInstrument: "选择乐器音色",
+    noteLength: "延音",
+    short: "短音",
+    long: "长音",
+    mode: "模式",
+    enterImmersive: "沉浸演奏",
+    exitImmersive: "退出沉浸",
+    more: "更多",
+    performance: "性能信息",
+    controls: "演奏控制",
+    startEngine: "点击启用音频引擎",
+    immersiveMode: "沉浸模式",
+    immersiveNotice: "仅琴键、Space、小键盘 + 和左 Alt 响应",
+    closePerformance: "关闭性能信息",
+    recentSchedule: "最近 JS 调度",
+    p95: "120 次 P95",
+    baseLatency: "浏览器基础延迟",
+    outputLatency: "输出延迟",
+    sampleRate: "采样率",
+    currentAction: "当前操作",
+    performanceNote: "声音始终先于视觉粒子调度。蓝牙设备仍会产生额外硬件延迟。",
+    instrumentLabel: "可切换六音区真实钢琴键盘与发光音符光尘",
+    liveInfo: "实时演奏信息",
+    schedule: "调度",
+    currentNote: "当前音",
+    extendedRange: "扩展音区",
+    lowRange: "低音区",
+    midRange: "中音区",
+    highRange: "高音区",
+    currentPlayable: "当前可演奏",
+    waitingSwitch: "待切换",
+    current: "当前",
+    extendedHint: "扩展音区",
+    lowHint: "低音区",
+    headphoneHint: "建议使用有线耳机获得最佳体验",
+    waitingSource: "等待加载原声音源",
+    languageChanged: "已切换至中文界面",
+  },
+  en: {
+    brand: "MeloVista",
+    tagline: "FOUR SCENES · SIX OCTAVES",
+    documentTitle: "MeloVista · Immersive Six-Octave Piano",
+    language: "Language",
+    languageName: "EN",
+    switchLanguage: "Switch to Chinese",
+    scene: "Scene",
+    chooseScene: "Choose a scene",
+    chooseWindow: "Choose a window",
+    timbre: "Voice",
+    chooseTimbre: "Choose a voice",
+    chooseInstrument: "Choose an instrument voice",
+    noteLength: "Length",
+    short: "Short",
+    long: "Long",
+    mode: "Mode",
+    enterImmersive: "Immersive",
+    exitImmersive: "Exit immersive",
+    more: "More",
+    performance: "Performance",
+    controls: "Performance controls",
+    startEngine: "Click to enable the audio engine",
+    immersiveMode: "Immersive mode",
+    immersiveNotice: "Only piano keys, Space, Numpad + and Left Alt respond",
+    closePerformance: "Close performance information",
+    recentSchedule: "Latest JS schedule",
+    p95: "120-event P95",
+    baseLatency: "Browser base latency",
+    outputLatency: "Output latency",
+    sampleRate: "Sample rate",
+    currentAction: "Current action",
+    performanceNote: "Sound is always scheduled before visual particles. Bluetooth devices still add hardware latency.",
+    instrumentLabel: "switchable six-octave sampled piano keyboard with glowing note particles",
+    liveInfo: "Live performance information",
+    schedule: "Schedule",
+    currentNote: "Current note",
+    extendedRange: "Extended range",
+    lowRange: "Low register",
+    midRange: "Middle register",
+    highRange: "High register",
+    currentPlayable: "playable now",
+    waitingSwitch: "switch to play",
+    current: "active",
+    extendedHint: "Extended range",
+    lowHint: "Low register",
+    headphoneHint: "Wired headphones are recommended for the best experience",
+    waitingSource: "Load the current sound source to begin",
+    languageChanged: "English interface enabled",
+  },
+} as const;
+
 const SAMPLE_BANKS: Record<SampleBankKey, SampleBank> = {
   acoustic: {
     basePath: "/audio/piano",
@@ -184,18 +288,18 @@ const SAMPLE_BANKS: Record<SampleBankKey, SampleBank> = {
 };
 
 const TIMBRE_OPTIONS: TimbreOption[] = [
-  { id: "acoustic", label: "原声", detail: "音乐厅钢琴", bank: "acoustic", gain: 0.82 },
-  { id: "bright", label: "明亮", detail: "清亮钢琴", bank: "acoustic", gain: 0.74 },
-  { id: "violin", label: "小提琴", detail: "温暖弓弦", bank: "violin", gain: 0.56 },
-  { id: "guitar", label: "钢丝弦吉他", detail: "清脆拨弦", bank: "guitar", gain: 0.72 },
-  { id: "saxophone", label: "萨克斯", detail: "醇厚管乐", bank: "saxophone", gain: 0.54 },
+  { id: "acoustic", label: { zh: "原声", en: "Acoustic" }, detail: { zh: "音乐厅钢琴", en: "Concert grand" }, bank: "acoustic", gain: 0.82 },
+  { id: "bright", label: { zh: "明亮", en: "Bright" }, detail: { zh: "清亮钢琴", en: "Brilliant piano" }, bank: "acoustic", gain: 0.74 },
+  { id: "violin", label: { zh: "小提琴", en: "Violin" }, detail: { zh: "温暖弓弦", en: "Warm bowed strings" }, bank: "violin", gain: 0.56 },
+  { id: "guitar", label: { zh: "钢丝弦吉他", en: "Steel-string guitar" }, detail: { zh: "清脆拨弦", en: "Crisp plucked strings" }, bank: "guitar", gain: 0.72 },
+  { id: "saxophone", label: { zh: "萨克斯", en: "Saxophone" }, detail: { zh: "醇厚管乐", en: "Mellow brass" }, bank: "saxophone", gain: 0.54 },
 ];
 
 const SCENE_OPTIONS: SceneOption[] = [
-  { id: "coast", label: "沧海听风", detail: "海风与暖阳", icon: "☀", image: "/scenes/coast-video-poster.jpg", video: "/video-scenes/coast.mp4", videoPosition: "50% 58%" },
-  { id: "forest", label: "山湖静语", detail: "湖面与雪峰", icon: "☘", image: "/scenes/mountain-lake-video-poster.jpg", video: "/video-scenes/mountain-lake.mp4", videoPosition: "50% 62%" },
-  { id: "rain", label: "雨夜伴灯", detail: "雨幕与暖灯", icon: "☂", image: "/scenes/rain-night-video-poster.jpg", video: "/video-scenes/rain-night.mp4", videoPosition: "50% 58%" },
-  { id: "stars", label: "暮光之城", detail: "落日与灯火", icon: "✦", image: "/scenes/twilight-city-video-poster.jpg", video: "/video-scenes/twilight-city.mp4", videoPosition: "50% 58%" },
+  { id: "coast", label: { zh: "沧海听风", en: "Sea Breeze" }, detail: { zh: "海风与暖阳", en: "Ocean air & warm sunlight" }, icon: "☀", image: "/scenes/coast-video-poster.jpg", video: "/video-scenes/coast.mp4", videoPosition: "50% 58%" },
+  { id: "forest", label: { zh: "山湖静语", en: "Alpine Stillness" }, detail: { zh: "湖面与雪峰", en: "Lake & snow peaks" }, icon: "☘", image: "/scenes/mountain-lake-video-poster.jpg", video: "/video-scenes/mountain-lake.mp4", videoPosition: "50% 62%" },
+  { id: "rain", label: { zh: "雨夜伴灯", en: "Rainlight Night" }, detail: { zh: "雨幕与暖灯", en: "Rainfall & lamplight" }, icon: "☂", image: "/scenes/rain-night-video-poster.jpg", video: "/video-scenes/rain-night.mp4", videoPosition: "50% 58%" },
+  { id: "stars", label: { zh: "暮光之城", en: "City at Dusk" }, detail: { zh: "落日与灯火", en: "Sunset & city lights" }, icon: "✦", image: "/scenes/twilight-city-video-poster.jpg", video: "/video-scenes/twilight-city.mp4", videoPosition: "50% 58%" },
 ];
 
 const TIMBRE_BY_ID = new Map(TIMBRE_OPTIONS.map((option) => [option.id, option]));
@@ -211,6 +315,10 @@ function keyToMidi(key: KeyDefinition, lowOctave: 2 | 3, extremeOctave: 1 | 6) {
 function keyToNote(key: KeyDefinition, lowOctave: 2 | 3, extremeOctave: 1 | 6) {
   const octave = key.group === "extreme" ? extremeOctave : key.group === "low" ? lowOctave : key.group === "mid" ? 4 : 5;
   return `${NOTE_NAMES[key.semitone]}${octave}`;
+}
+
+function keyDisplayLabel(key: KeyDefinition, locale: Locale) {
+  return key.code === "Backspace" ? (locale === "zh" ? "删除" : "Bksp") : key.label;
 }
 
 function percentile95(values: number[]) {
@@ -254,26 +362,31 @@ function PianoOctave({
   keys,
   activeCodes,
   enabled = true,
+  locale,
 }: {
   title: string;
   octave: number;
   keys: KeyDefinition[];
   activeCodes: Set<string>;
   enabled?: boolean;
+  locale: Locale;
 }) {
+  const copy = UI_COPY[locale];
   const naturals = keys.filter((key) => !key.accidental);
   const accidentals = keys.filter((key) => key.accidental);
 
   return (
     <section
       className={`piano-octave ${enabled ? "enabled" : "inactive"}`}
-      aria-label={`${title} C${octave} 到 B${octave}，${enabled ? "当前可演奏" : "待切换"}`}
+      aria-label={locale === "zh"
+        ? `${title} C${octave} 到 B${octave}，${enabled ? copy.currentPlayable : copy.waitingSwitch}`
+        : `${title} C${octave} to B${octave}, ${enabled ? copy.currentPlayable : copy.waitingSwitch}`}
     >
       <div className="white-keys">
         {naturals.map((key) => (
           <div className={`piano-key white ${enabled && activeCodes.has(key.code) ? "active" : ""}`} key={key.code} data-key-code={key.code}>
             <div className="piano-key-label">
-              <kbd>{key.label}</kbd>
+              <kbd>{keyDisplayLabel(key, locale)}</kbd>
               <span>{NOTE_NAMES[key.semitone]}{octave}</span>
             </div>
           </div>
@@ -287,12 +400,12 @@ function PianoOctave({
           style={{ left: blackKeyLeft(key.semitone) }}
         >
           <div className="piano-key-label">
-            <kbd>{key.label}</kbd>
+            <kbd>{keyDisplayLabel(key, locale)}</kbd>
             <span>{NOTE_NAMES[key.semitone]}{octave}</span>
           </div>
         </div>
       ))}
-      <div className="octave-caption">C{octave}—B{octave} · {enabled ? "当前" : "待切换"}</div>
+      <div className="octave-caption">C{octave}—B{octave} · {enabled ? copy.current : copy.waitingSwitch}</div>
     </section>
   );
 }
@@ -309,6 +422,7 @@ export default function Home() {
   const extremeOctaveRef = useRef<1 | 6>(1);
   const articulationRef = useRef<Articulation>("short");
   const timbreRef = useRef<Timbre>("acoustic");
+  const localeRef = useRef<Locale>("zh");
   const immersiveModeRef = useRef(false);
   const fullscreenEnteredRef = useRef(false);
   const measurementsRef = useRef<number[]>([]);
@@ -322,13 +436,14 @@ export default function Home() {
   const [articulation, setArticulation] = useState<Articulation>("short");
   const [timbre, setTimbre] = useState<Timbre>("acoustic");
   const [scene, setScene] = useState<SceneId>("coast");
+  const [locale, setLocale] = useState<Locale>("zh");
   const [videoEnabled, setVideoEnabled] = useState(false);
   const [readyVideoScene, setReadyVideoScene] = useState<SceneId | null>(null);
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const [immersiveMode, setImmersiveMode] = useState(false);
   const [showPerformance, setShowPerformance] = useState(false);
   const [activeCodes, setActiveCodes] = useState<Set<string>>(new Set());
-  const [lastNote, setLastNote] = useState("等待加载原声音源");
+  const [lastNote, setLastNote] = useState(UI_COPY.zh.waitingSource);
   const [lastScheduleMs, setLastScheduleMs] = useState(0);
   const [p95ScheduleMs, setP95ScheduleMs] = useState(0);
   const [diagnostics, setDiagnostics] = useState<AudioDiagnostics | null>(null);
@@ -363,9 +478,13 @@ export default function Home() {
 
   const toggleArticulation = useCallback(() => {
     const next = articulationRef.current === "short" ? "long" : "short";
+    const currentLocale = localeRef.current;
+    const copy = UI_COPY[currentLocale];
     articulationRef.current = next;
     setArticulation(next);
-    setLastNote(`已切换到${next === "long" ? "长音" : "短音"}模式`);
+    setLastNote(currentLocale === "zh"
+      ? `已切换到${next === "long" ? copy.long : copy.short}模式`
+      : `Note length switched to ${next === "long" ? copy.long : copy.short}`);
   }, []);
 
   const spawnNoteLight = useCallback((key: KeyDefinition) => {
@@ -451,7 +570,9 @@ export default function Home() {
 
     setLastScheduleMs(scheduledMs);
     setP95ScheduleMs(percentile95(measurements));
-    setLastNote(`${keyToNote(key, lowOctaveRef.current, extremeOctaveRef.current)} · ${key.label} · ${currentTimbre.label} · ${articulationRef.current === "long" ? "长音" : "短音"}`);
+    const currentLocale = localeRef.current;
+    const copy = UI_COPY[currentLocale];
+    setLastNote(`${keyToNote(key, lowOctaveRef.current, extremeOctaveRef.current)} · ${keyDisplayLabel(key, currentLocale)} · ${currentTimbre.label[currentLocale]} · ${articulationRef.current === "long" ? copy.long : copy.short}`);
     return true;
   }, [spawnNoteLight]);
 
@@ -499,12 +620,16 @@ export default function Home() {
     ]);
 
     const currentTimbre = TIMBRE_BY_ID.get(timbreRef.current) ?? TIMBRE_OPTIONS[0];
+    const currentLocale = localeRef.current;
+    const timbreLabel = currentTimbre.label[currentLocale];
     try {
       await ensureSampleBank(context, currentTimbre.bank);
     } catch {
       setAudioStatus("error");
       setIsAudioReady(false);
-      setLastNote(`${currentTimbre.label}音源加载失败，请检查网络后重试`);
+      setLastNote(currentLocale === "zh"
+        ? `${timbreLabel}音源加载失败，请检查网络后重试`
+        : `${timbreLabel} source failed to load. Check your connection and retry.`);
       return;
     }
 
@@ -517,7 +642,9 @@ export default function Home() {
     const running = context.state === "running";
     setIsAudioReady(running);
     setAudioStatus(running ? "running" : "suspended");
-    setLastNote(running ? `${currentTimbre.label}音色已就绪，可以弹奏` : "音源已加载，请再次点击启动音频");
+    setLastNote(currentLocale === "zh"
+      ? (running ? `${timbreLabel}音色已就绪，可以弹奏` : "音源已加载，请再次点击启动音频")
+      : (running ? `${timbreLabel} is ready to play` : "Source loaded. Click again to start audio."));
   }, [ensureSampleBank]);
 
   const selectTimbre = useCallback(async (next: Timbre) => {
@@ -526,12 +653,16 @@ export default function Home() {
     timbreRef.current = next;
     setTimbre(next);
     const option = TIMBRE_BY_ID.get(next) ?? TIMBRE_OPTIONS[0];
+    const currentLocale = localeRef.current;
+    const optionLabel = option.label[currentLocale];
     const context = audioContextRef.current;
 
     if (!context) {
       setIsAudioReady(false);
       setAudioStatus("idle");
-      setLastNote(`已选择${option.label}，点击右上角加载音源`);
+      setLastNote(currentLocale === "zh"
+        ? `已选择${optionLabel}，点击右上角加载音源`
+        : `${optionLabel} selected. Use the top-right control to load it.`);
       return;
     }
 
@@ -541,23 +672,70 @@ export default function Home() {
     } catch {
       setAudioStatus("error");
       setIsAudioReady(false);
-      setLastNote(`${option.label}音源加载失败，请重试`);
+      setLastNote(currentLocale === "zh" ? `${optionLabel}音源加载失败，请重试` : `${optionLabel} source failed to load. Please retry.`);
       return;
     }
 
     const running = context.state === "running";
     setIsAudioReady(running);
     setAudioStatus(running ? "running" : "suspended");
-    setLastNote(running ? `已切换到${option.label}音色` : `${option.label}已加载，点击右上角恢复音频`);
+    setLastNote(currentLocale === "zh"
+      ? (running ? `已切换到${optionLabel}音色` : `${optionLabel}已加载，点击右上角恢复音频`)
+      : (running ? `Switched to ${optionLabel}` : `${optionLabel} loaded. Use the top-right control to resume audio.`));
   }, [audioStatus, ensureSampleBank, releaseAll]);
 
   const selectScene = useCallback((next: SceneId) => {
     const option = SCENE_BY_ID.get(next) ?? SCENE_OPTIONS[0];
+    const currentLocale = localeRef.current;
     setScene(next);
     setOpenMenu(null);
     particleLayerRef.current?.replaceChildren();
-    setLastNote(`已进入${option.label} · ${option.detail}`);
+    setLastNote(currentLocale === "zh"
+      ? `已进入${option.label.zh} · ${option.detail.zh}`
+      : `Entered ${option.label.en} · ${option.detail.en}`);
   }, []);
+
+  const changeLocale = useCallback((next: Locale, announce = true) => {
+    localeRef.current = next;
+    setLocale(next);
+    setOpenMenu(null);
+    try {
+      window.localStorage.setItem("melovista-locale", next);
+      const url = new URL(window.location.href);
+      url.searchParams.set("lang", next);
+      window.history.replaceState(null, "", url);
+    } catch {
+      // Language switching still works when storage or URL access is restricted.
+    }
+    if (announce) setLastNote(UI_COPY[next].languageChanged);
+  }, []);
+
+  useEffect(() => {
+    const queryLocale = new URLSearchParams(window.location.search).get("lang");
+    let savedLocale: string | null = null;
+    try {
+      savedLocale = window.localStorage.getItem("melovista-locale");
+    } catch {
+      savedLocale = null;
+    }
+    const browserLocale: Locale = navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
+    const nextLocale: Locale = queryLocale === "zh" || queryLocale === "en"
+      ? queryLocale
+      : savedLocale === "zh" || savedLocale === "en"
+        ? savedLocale
+        : browserLocale;
+    const localeTimer = window.setTimeout(() => {
+      localeRef.current = nextLocale;
+      setLocale(nextLocale);
+      setLastNote(UI_COPY[nextLocale].waitingSource);
+    }, 0);
+    return () => window.clearTimeout(localeTimer);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
+    document.title = UI_COPY[locale].documentTitle;
+  }, [locale]);
 
   useEffect(() => {
     const preloadTimer = window.setTimeout(() => {
@@ -591,14 +769,16 @@ export default function Home() {
     releaseAll(0.06);
     (navigator as KeyboardLockNavigator).keyboard?.unlock?.();
     if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined);
-    setLastNote("已退出沉浸模式，快捷控制恢复");
+    setLastNote(localeRef.current === "zh" ? "已退出沉浸模式，快捷控制恢复" : "Immersive mode closed. All shortcuts are available again.");
   }, [releaseAll]);
 
   const enterImmersiveMode = useCallback(async () => {
     releaseAll(0.06);
     immersiveModeRef.current = true;
     setImmersiveMode(true);
-    setLastNote("沉浸模式已开启：仅琴键与演奏控制响应");
+    setLastNote(localeRef.current === "zh"
+      ? "沉浸模式已开启：仅琴键与演奏控制响应"
+      : "Immersive mode enabled: only piano keys and performance controls respond");
 
     try {
       await document.documentElement.requestFullscreen({
@@ -659,7 +839,9 @@ export default function Home() {
         lowOctaveRef.current = nextOctave;
         setLowOctave(nextOctave);
         setActiveCodes(new Set(activeCodesRef.current));
-        setLastNote(`低音区已切换到 C${nextOctave} — B${nextOctave}`);
+        setLastNote(localeRef.current === "zh"
+          ? `低音区已切换到 C${nextOctave} — B${nextOctave}`
+          : `Low register switched to C${nextOctave} — B${nextOctave}`);
         return;
       }
 
@@ -674,7 +856,9 @@ export default function Home() {
         extremeOctaveRef.current = nextOctave;
         setExtremeOctave(nextOctave);
         setActiveCodes(new Set(activeCodesRef.current));
-        setLastNote(`扩展音区已切换到 C${nextOctave} — B${nextOctave}`);
+        setLastNote(localeRef.current === "zh"
+          ? `扩展音区已切换到 C${nextOctave} — B${nextOctave}`
+          : `Extended range switched to C${nextOctave} — B${nextOctave}`);
         return;
       }
 
@@ -686,7 +870,9 @@ export default function Home() {
       const eventStartedAt = performance.now();
       activeCodesRef.current.add(event.code);
       const started = startVoice(event.code, key, eventStartedAt);
-      if (!started) setLastNote(`${keyToNote(key, lowOctaveRef.current, extremeOctaveRef.current)} · 请先加载并启动当前音源`);
+      if (!started) setLastNote(localeRef.current === "zh"
+        ? `${keyToNote(key, lowOctaveRef.current, extremeOctaveRef.current)} · 请先加载并启动当前音源`
+        : `${keyToNote(key, lowOctaveRef.current, extremeOctaveRef.current)} · Load and start the current sound source first`);
       setActiveCodes(new Set(activeCodesRef.current));
     };
 
@@ -719,7 +905,9 @@ export default function Home() {
         setImmersiveMode(false);
         (navigator as KeyboardLockNavigator).keyboard?.unlock?.();
         releaseAll(0.06);
-        setLastNote("全屏已退出，沉浸模式同步关闭");
+        setLastNote(localeRef.current === "zh"
+          ? "全屏已退出，沉浸模式同步关闭"
+          : "Fullscreen ended, so immersive mode was closed too");
       }
     };
 
@@ -741,22 +929,25 @@ export default function Home() {
   }, [releaseAll, releaseVoice, startVoice, toggleArticulation]);
 
   const activeCodeSet = useMemo(() => activeCodes, [activeCodes]);
+  const copy = UI_COPY[locale];
   const selectedTimbre = TIMBRE_BY_ID.get(timbre) ?? TIMBRE_OPTIONS[0];
   const selectedScene = SCENE_BY_ID.get(scene) ?? SCENE_OPTIONS[0];
+  const selectedTimbreLabel = selectedTimbre.label[locale];
+  const selectedSceneLabel = selectedScene.label[locale];
   const audioButtonText = audioStatus === "running"
-    ? `${selectedTimbre.label}已就绪`
+    ? (locale === "zh" ? `${selectedTimbreLabel}已就绪` : `${selectedTimbreLabel} ready`)
     : audioStatus === "loading"
-      ? `正在加载${selectedTimbre.label} ${sampleProgress}/${sampleTotal}`
+      ? (locale === "zh" ? `正在加载${selectedTimbreLabel} ${sampleProgress}/${sampleTotal}` : `Loading ${selectedTimbreLabel} ${sampleProgress}/${sampleTotal}`)
       : audioStatus === "starting"
-        ? "正在启动音频…"
+        ? (locale === "zh" ? "正在启动音频…" : "Starting audio…")
         : audioStatus === "suspended"
-          ? "音频已暂停，点击恢复"
+          ? (locale === "zh" ? "音频已暂停，点击恢复" : "Audio paused · click to resume")
           : audioStatus === "error"
-            ? "加载失败，点击重试"
-            : `加载并启动${selectedTimbre.label}`;
+            ? (locale === "zh" ? "加载失败，点击重试" : "Load failed · click to retry")
+            : (locale === "zh" ? `加载并启动${selectedTimbreLabel}` : `Load & start ${selectedTimbreLabel}`);
 
   return (
-    <main className={`app-shell sunroom ${immersiveMode ? "immersive" : ""} ${activeCodes.size ? "playing" : ""}`} data-scene={scene}>
+    <main className={`app-shell sunroom ${immersiveMode ? "immersive" : ""} ${activeCodes.size ? "playing" : ""}`} data-scene={scene} data-locale={locale}>
       <div className="scene-background" key={`poster-${scene}`} style={{ backgroundImage: `url(${selectedScene.image})` }} aria-hidden="true" />
       {videoEnabled && (
         <video
@@ -782,24 +973,24 @@ export default function Home() {
         <div className="brand-lockup">
           <span className="brand-mark" aria-hidden="true">≋</span>
           <div>
-            <h1>Six Octave Piano Lab</h1>
-            <p>{selectedScene.label}的沉浸式琴房</p>
+            <h1>{copy.brand}</h1>
+            <p>{copy.tagline}</p>
           </div>
         </div>
 
-        <nav className="control-dock" aria-label="演奏控制" ref={controlDockRef}>
+        <nav className="control-dock" aria-label={copy.controls} ref={controlDockRef}>
           <div className="dock-menu-wrap scene-selector">
             <button className={`dock-button scene-item ${openMenu === "scene" ? "active" : ""}`} type="button" aria-haspopup="listbox" aria-expanded={openMenu === "scene"} onClick={() => setOpenMenu((current) => current === "scene" ? null : "scene")}>
               <span className="dock-icon" aria-hidden="true">{selectedScene.icon}</span>
-              <span><small>场景</small><b>{selectedScene.label}</b></span>
+              <span><small>{copy.scene}</small><b>{selectedSceneLabel}</b></span>
               <i className="dock-chevron" aria-hidden="true">⌄</i>
             </button>
-            <div className={`glass-menu scene-menu ${openMenu === "scene" ? "open" : ""}`} role="listbox" aria-label="选择场景">
-              <div className="menu-heading"><small>SCENES</small><strong>选择一扇窗</strong></div>
+            <div className={`glass-menu scene-menu ${openMenu === "scene" ? "open" : ""}`} role="listbox" aria-label={copy.chooseScene}>
+              <div className="menu-heading"><small>SCENES</small><strong>{copy.chooseWindow}</strong></div>
               {SCENE_OPTIONS.map((option) => (
                 <button className={scene === option.id ? "selected" : ""} type="button" role="option" aria-selected={scene === option.id} key={option.id} onClick={() => selectScene(option.id)}>
                   <i className="scene-thumb" style={{ backgroundImage: `url(${option.image})` }} aria-hidden="true" />
-                  <span><strong>{option.label}</strong><small>{option.detail}</small></span>
+                  <span><strong>{option.label[locale]}</strong><small>{option.detail[locale]}</small></span>
                   <b aria-hidden="true">{scene === option.id ? "✓" : ""}</b>
                 </button>
               ))}
@@ -808,15 +999,15 @@ export default function Home() {
           <div className="dock-menu-wrap timbre-selector">
             <button className={`dock-button timbre-button ${openMenu === "timbre" ? "active" : ""}`} type="button" disabled={audioStatus === "loading"} aria-haspopup="listbox" aria-expanded={openMenu === "timbre"} onClick={() => setOpenMenu((current) => current === "timbre" ? null : "timbre")}>
               <span className="dock-icon" aria-hidden="true">♩</span>
-              <span><small>音色</small><b>{selectedTimbre.label}</b></span>
+              <span><small>{copy.timbre}</small><b>{selectedTimbreLabel}</b></span>
               <i className="dock-chevron" aria-hidden="true">⌄</i>
             </button>
-            <div className={`glass-menu timbre-menu ${openMenu === "timbre" ? "open" : ""}`} role="listbox" aria-label="选择音色">
-              <div className="menu-heading"><small>TIMBRE</small><strong>选择乐器音色</strong></div>
+            <div className={`glass-menu timbre-menu ${openMenu === "timbre" ? "open" : ""}`} role="listbox" aria-label={copy.chooseTimbre}>
+              <div className="menu-heading"><small>TIMBRE</small><strong>{copy.chooseInstrument}</strong></div>
               {TIMBRE_OPTIONS.map((option) => (
                 <button className={timbre === option.id ? "selected" : ""} type="button" role="option" aria-selected={timbre === option.id} key={option.id} onClick={() => { setOpenMenu(null); void selectTimbre(option.id); }}>
                   <i className="timbre-orb" aria-hidden="true">{option.id === "acoustic" || option.id === "bright" ? "♩" : option.id === "violin" ? "𝄞" : option.id === "guitar" ? "♢" : "◖"}</i>
-                  <span><strong>{option.label}</strong><small>{option.detail}</small></span>
+                  <span><strong>{option.label[locale]}</strong><small>{option.detail[locale]}</small></span>
                   <b aria-hidden="true">{timbre === option.id ? "✓" : ""}</b>
                 </button>
               ))}
@@ -824,80 +1015,84 @@ export default function Home() {
           </div>
           <button className={`dock-button ${articulation === "long" ? "active" : ""}`} type="button" onClick={toggleArticulation} data-testid="articulation-toggle">
             <span className="dock-icon" aria-hidden="true">⌁</span>
-            <span><small>延音</small><b data-testid="articulation-mode">{articulation === "long" ? "长音" : "短音"}</b></span>
+            <span><small>{copy.noteLength}</small><b data-testid="articulation-mode">{articulation === "long" ? copy.long : copy.short}</b></span>
           </button>
           <button className={`dock-button ${immersiveMode ? "active" : ""}`} type="button" aria-pressed={immersiveMode} onClick={toggleImmersiveMode} data-testid="immersive-toggle">
             <span className="dock-icon" aria-hidden="true">◎</span>
-            <span><small>模式</small><b>{immersiveMode ? "退出沉浸" : "沉浸演奏"}</b></span>
+            <span><small>{copy.mode}</small><b>{immersiveMode ? copy.exitImmersive : copy.enterImmersive}</b></span>
           </button>
           <button className={`dock-button ${showPerformance ? "active" : ""}`} type="button" aria-pressed={showPerformance} onClick={() => setShowPerformance((value) => !value)}>
             <span className="dock-icon" aria-hidden="true">⋯</span>
-            <span><small>更多</small><b>性能信息</b></span>
+            <span><small>{copy.more}</small><b>{copy.performance}</b></span>
+          </button>
+          <button className="dock-button language-button" type="button" aria-label={copy.switchLanguage} onClick={() => changeLocale(locale === "zh" ? "en" : "zh")} data-testid="language-toggle">
+            <span className="dock-icon language-icon" aria-hidden="true">文</span>
+            <span><small>{copy.language}</small><b>{locale === "zh" ? "中 / EN" : "EN / 中"}</b></span>
           </button>
         </nav>
 
         <button className={`audio-status ${isAudioReady ? "ready" : ""}`} onClick={initializeAudio} disabled={audioStatus === "loading"} data-testid="start-audio">
           <i />
-          <span>{audioButtonText}<small>{audioStatus === "running" ? `${selectedTimbre.label} · ${articulation === "long" ? "长音" : "短音"}` : "点击启用音频引擎"}</small></span>
+          <span>{audioButtonText}<small>{audioStatus === "running" ? `${selectedTimbreLabel} · ${articulation === "long" ? copy.long : copy.short}` : copy.startEngine}</small></span>
         </button>
       </header>
 
       {immersiveMode && (
         <div className="immersive-notice" role="status">
-          <strong>沉浸模式</strong>
-          <span>仅琴键、Space、小键盘 + 和左 Alt 响应</span>
+          <strong>{copy.immersiveMode}</strong>
+          <span>{copy.immersiveNotice}</span>
         </div>
       )}
 
       <aside className={`performance-drawer ${showPerformance ? "open" : ""}`} aria-hidden={!showPerformance}>
         <div className="drawer-heading">
-          <div><small>PERFORMANCE</small><strong>性能信息</strong></div>
-          <button type="button" onClick={() => setShowPerformance(false)} aria-label="关闭性能信息">×</button>
+          <div><small>PERFORMANCE</small><strong>{copy.performance}</strong></div>
+          <button type="button" onClick={() => setShowPerformance(false)} aria-label={copy.closePerformance}>×</button>
         </div>
         <dl>
-          <div><dt>最近 JS 调度</dt><dd>{lastScheduleMs.toFixed(2)} ms</dd></div>
-          <div><dt>120 次 P95</dt><dd>{p95ScheduleMs.toFixed(2)} ms</dd></div>
-          <div><dt>浏览器基础延迟</dt><dd>{diagnostics ? `${(diagnostics.baseLatency * 1000).toFixed(1)} ms` : "—"}</dd></div>
-          <div><dt>输出延迟</dt><dd>{diagnostics?.outputLatency != null ? `${(diagnostics.outputLatency * 1000).toFixed(1)} ms` : "—"}</dd></div>
-          <div><dt>采样率</dt><dd>{diagnostics ? `${diagnostics.sampleRate} Hz` : "—"}</dd></div>
-          <div><dt>当前操作</dt><dd data-testid="last-note">{lastNote}</dd></div>
+          <div><dt>{copy.recentSchedule}</dt><dd>{lastScheduleMs.toFixed(2)} ms</dd></div>
+          <div><dt>{copy.p95}</dt><dd>{p95ScheduleMs.toFixed(2)} ms</dd></div>
+          <div><dt>{copy.baseLatency}</dt><dd>{diagnostics ? `${(diagnostics.baseLatency * 1000).toFixed(1)} ms` : "—"}</dd></div>
+          <div><dt>{copy.outputLatency}</dt><dd>{diagnostics?.outputLatency != null ? `${(diagnostics.outputLatency * 1000).toFixed(1)} ms` : "—"}</dd></div>
+          <div><dt>{copy.sampleRate}</dt><dd>{diagnostics ? `${diagnostics.sampleRate} Hz` : "—"}</dd></div>
+          <div><dt>{copy.currentAction}</dt><dd data-testid="last-note">{lastNote}</dd></div>
         </dl>
-        <p>声音始终先于视觉粒子调度。蓝牙设备仍会产生额外硬件延迟。</p>
+        <p>{copy.performanceNote}</p>
         <div className="sample-credit">
           Samples: <a href="https://github.com/sfzinstruments/SalamanderGrandPiano" target="_blank" rel="noreferrer">Salamander Grand Piano V3</a> · <a href="https://nbrosowsky.github.io/tonejs-instruments/" target="_blank" rel="noreferrer">tonejs-instruments</a> · CC BY 3.0
         </div>
       </aside>
 
-      <section className="instrument-panel" aria-label={`${selectedScene.label}可切换六音区真实钢琴键盘与发光音符光尘`}>
+      <section className="instrument-panel" aria-label={`${selectedSceneLabel} ${copy.instrumentLabel}`}>
         <div className="instrument-scroll">
           <div className="instrument-stage">
             <div className="particle-surface" ref={particleLayerRef} aria-hidden="true" />
-            <div className="performance-pill" aria-label="实时演奏信息">
-              <div><span>调度</span><strong data-testid="last-schedule">{lastScheduleMs.toFixed(2)}<small> ms</small></strong></div>
+            <div className="performance-pill" aria-label={copy.liveInfo}>
+              <div><span>{copy.schedule}</span><strong data-testid="last-schedule">{lastScheduleMs.toFixed(2)}<small> ms</small></strong></div>
               <div><span>P95</span><strong data-testid="p95-schedule">{p95ScheduleMs.toFixed(2)}<small> ms</small></strong></div>
-              <div className="current-note"><span>当前音</span><strong>{lastNote.split("·")[0].trim()}</strong></div>
+              <div className="current-note"><span>{copy.currentNote}</span><strong>{lastNote.split("·")[0].trim()}</strong></div>
               <i className="level-bars" aria-hidden="true"><b /><b /><b /><b /></i>
             </div>
             <div className="piano-shell">
-              <PianoOctave title="扩展音区" octave={1} keys={EXTREME_KEYS} activeCodes={activeCodeSet} enabled={extremeOctave === 1} />
-              <PianoOctave title="低音区" octave={2} keys={LOW_KEYS} activeCodes={activeCodeSet} enabled={lowOctave === 2} />
-              <PianoOctave title="低音区" octave={3} keys={LOW_KEYS} activeCodes={activeCodeSet} enabled={lowOctave === 3} />
-              <PianoOctave title="中音区" octave={4} keys={MID_KEYS} activeCodes={activeCodeSet} />
-              <PianoOctave title="高音区" octave={5} keys={HIGH_KEYS} activeCodes={activeCodeSet} />
-              <PianoOctave title="扩展音区" octave={6} keys={EXTREME_KEYS} activeCodes={activeCodeSet} enabled={extremeOctave === 6} />
+              <PianoOctave title={copy.extendedRange} octave={1} keys={EXTREME_KEYS} activeCodes={activeCodeSet} enabled={extremeOctave === 1} locale={locale} />
+              <PianoOctave title={copy.lowRange} octave={2} keys={LOW_KEYS} activeCodes={activeCodeSet} enabled={lowOctave === 2} locale={locale} />
+              <PianoOctave title={copy.lowRange} octave={3} keys={LOW_KEYS} activeCodes={activeCodeSet} enabled={lowOctave === 3} locale={locale} />
+              <PianoOctave title={copy.midRange} octave={4} keys={MID_KEYS} activeCodes={activeCodeSet} locale={locale} />
+              <PianoOctave title={copy.highRange} octave={5} keys={HIGH_KEYS} activeCodes={activeCodeSet} locale={locale} />
+              <PianoOctave title={copy.extendedRange} octave={6} keys={EXTREME_KEYS} activeCodes={activeCodeSet} enabled={extremeOctave === 6} locale={locale} />
             </div>
           </div>
         </div>
       </section>
 
       <footer className="key-hints">
-        <span><kbd>NUM +</kbd> 扩展音区 C{extremeOctave}</span>
+        <span><kbd>NUM +</kbd> {copy.extendedHint} C{extremeOctave}</span>
         <i />
-        <span><kbd>SPACE</kbd> 低音区 C{lowOctave}</span>
+        <span><kbd>SPACE</kbd> {copy.lowHint} C{lowOctave}</span>
         <i />
-        <span><kbd>LEFT ALT</kbd> {articulation === "long" ? "长音" : "短音"}</span>
+        <span><kbd>LEFT ALT</kbd> {articulation === "long" ? copy.long : copy.short}</span>
         <i />
-        <span>建议使用有线耳机获得最佳体验</span>
+        <span>{copy.headphoneHint}</span>
       </footer>
     </main>
   );

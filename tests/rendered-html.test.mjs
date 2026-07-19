@@ -20,7 +20,8 @@ test("server-renders the immersive six-range piano", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>四景 · 六音区沉浸式钢琴<\/title>/i);
+  assert.match(html, /<title>乐境 MeloVista · 沉浸式六音区钢琴<\/title>/i);
+  assert.match(html, /乐境 MeloVista/);
   assert.match(html, /沧海听风/);
   assert.match(html, /加载并启动原声/);
   assert.match(html, /aria-label="扩展音区 C1 到 B1，当前可演奏"/);
@@ -30,7 +31,7 @@ test("server-renders the immersive six-range piano", async () => {
   assert.match(html, /aria-label="高音区 C5 到 B5，当前可演奏"/);
   assert.match(html, /aria-label="扩展音区 C6 到 B6，待切换"/);
   assert.equal(html.match(/class="piano-octave /g)?.length, 6);
-  assert.match(html, /aria-label="沧海听风可切换六音区真实钢琴键盘与发光音符光尘"/);
+  assert.match(html, /aria-label="沧海听风 可切换六音区真实钢琴键盘与发光音符光尘"/);
   assert.match(html, /NUM \+/);
   assert.match(html, /山湖静语/);
   assert.match(html, /雨夜伴灯/);
@@ -47,6 +48,19 @@ test("server-renders the immersive six-range piano", async () => {
   assert.match(html, /Salamander Grand Piano V3/);
   assert.match(html, /tonejs-instruments/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
+});
+
+test("MeloVista provides persistent Chinese and English interfaces", async () => {
+  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(source, /type Locale = "zh" \| "en"/);
+  assert.match(source, /data-testid="language-toggle"/);
+  assert.match(source, /localStorage\.setItem\("melovista-locale", next\)/);
+  assert.match(source, /url\.searchParams\.set\("lang", next\)/);
+  assert.match(source, /navigator\.language\.toLowerCase\(\)\.startsWith\("zh"\)/);
+  assert.match(source, /document\.documentElement\.lang = locale === "zh" \? "zh-CN" : "en"/);
+  for (const text of ["MeloVista", "Sea Breeze", "Alpine Stillness", "Rainlight Night", "City at Dusk", "Steel-string guitar", "Immersive mode", "Performance controls"]) {
+    assert.match(source, new RegExp(text));
+  }
 });
 
 test("dynamic scenes use muted looping video with poster and reduced-motion fallback", async () => {
