@@ -79,6 +79,7 @@ type SceneOption = {
   image: string;
   video: string;
   ambience: string;
+  ambientGain: number;
   videoPosition: string;
 };
 
@@ -169,7 +170,6 @@ const LONG_RELEASE_TIME_CONSTANT_SECONDS = 1.8;
 const LONG_RELEASE_STOP_SECONDS = 9;
 const AMBIENT_VOLUME = 0.28;
 const AMBIENT_CROSSFADE_SECONDS = 0.8;
-const VIDEO_CROSSFADE_SECONDS = 1.25;
 
 const UI_COPY = {
   zh: {
@@ -388,10 +388,10 @@ const TIMBRE_OPTIONS: TimbreOption[] = [
 ];
 
 const SCENE_OPTIONS: SceneOption[] = [
-  { id: "coast", label: { zh: "沧海听风", en: "Sea Breeze" }, detail: { zh: "海风与暖阳", en: "Ocean air & warm sunlight" }, icon: "☀", image: "/scenes/coast-video-poster.jpg", video: "/video-scenes/coast.mp4", ambience: "/audio/ambience/coast.wav", videoPosition: "50% 58%" },
-  { id: "forest", label: { zh: "山湖静语", en: "Alpine Stillness" }, detail: { zh: "湖面与雪峰", en: "Lake & snow peaks" }, icon: "☘", image: "/scenes/mountain-lake-video-poster.jpg", video: "/video-scenes/mountain-lake.mp4", ambience: "/audio/ambience/mountain-lake.wav", videoPosition: "50% 62%" },
-  { id: "rain", label: { zh: "雨夜伴灯", en: "Rainlight Night" }, detail: { zh: "雨幕与暖灯", en: "Rainfall & lamplight" }, icon: "☂", image: "/scenes/rain-night-video-poster.jpg", video: "/video-scenes/rain-night.mp4", ambience: "/audio/ambience/rain-night.wav", videoPosition: "50% 58%" },
-  { id: "stars", label: { zh: "暮光之城", en: "City at Dusk" }, detail: { zh: "落日与灯火", en: "Sunset & city lights" }, icon: "✦", image: "/scenes/twilight-city-video-poster.jpg", video: "/video-scenes/twilight-city.mp4", ambience: "/audio/ambience/twilight-city.wav", videoPosition: "50% 58%" },
+  { id: "coast", label: { zh: "沧海听风", en: "Sea Breeze" }, detail: { zh: "海风与暖阳", en: "Ocean air & warm sunlight" }, icon: "☀", image: "/scenes/coast-video-poster.jpg", video: "/video-scenes/coast.mp4", ambience: "/audio/ambience/coast.wav", ambientGain: 1, videoPosition: "50% 58%" },
+  { id: "forest", label: { zh: "山湖静语", en: "Alpine Stillness" }, detail: { zh: "湖面与雪峰", en: "Lake & snow peaks" }, icon: "☘", image: "/scenes/mountain-lake-video-poster.jpg", video: "/video-scenes/mountain-lake.mp4", ambience: "/audio/ambience/mountain-lake.wav", ambientGain: 1, videoPosition: "50% 62%" },
+  { id: "rain", label: { zh: "雨夜伴灯", en: "Rainlight Night" }, detail: { zh: "雨幕与暖灯", en: "Rainfall & lamplight" }, icon: "☂", image: "/scenes/rain-night-video-poster.jpg", video: "/video-scenes/rain-night.mp4", ambience: "/audio/ambience/rain-night.wav", ambientGain: 0.42, videoPosition: "50% 58%" },
+  { id: "stars", label: { zh: "暮光之城", en: "City at Dusk" }, detail: { zh: "落日与灯火", en: "Sunset & city lights" }, icon: "✦", image: "/scenes/twilight-city-video-poster.jpg", video: "/video-scenes/twilight-city.mp4", ambience: "/audio/ambience/twilight-city.wav", ambientGain: 1, videoPosition: "50% 58%" },
 ];
 
 const LIBRARY_SONGS: LibrarySong[] = [
@@ -583,10 +583,6 @@ export default function Home() {
   const particleLayerRef = useRef<HTMLDivElement | null>(null);
   const controlDockRef = useRef<HTMLElement | null>(null);
   const midiInputRef = useRef<HTMLInputElement | null>(null);
-  const sceneVideoRefs = useRef<Array<HTMLVideoElement | null>>([null, null]);
-  const activeVideoLayerRef = useRef<0 | 1>(0);
-  const videoTransitioningRef = useRef(false);
-  const videoTransitionTimerRef = useRef<number | null>(null);
   const ambientBuffersRef = useRef(new Map<SceneId, AudioBuffer>());
   const ambientVoiceRef = useRef<AmbientVoice | null>(null);
   const ambientEnabledRef = useRef(false);
@@ -613,7 +609,6 @@ export default function Home() {
   const [locale, setLocale] = useState<Locale>("zh");
   const [videoEnabled, setVideoEnabled] = useState(false);
   const [readyVideoScene, setReadyVideoScene] = useState<SceneId | null>(null);
-  const [activeVideoLayer, setActiveVideoLayer] = useState<0 | 1>(0);
   const [ambientEnabled, setAmbientEnabled] = useState(false);
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const [immersiveMode, setImmersiveMode] = useState(false);
@@ -823,12 +818,14 @@ export default function Home() {
 
     const now = context.currentTime;
     const previous = ambientVoiceRef.current;
+    const option = SCENE_BY_ID.get(sceneId) ?? SCENE_OPTIONS[0];
+    const targetGain = AMBIENT_VOLUME * option.ambientGain;
     const source = context.createBufferSource();
     const gain = context.createGain();
     source.buffer = buffer;
     source.loop = true;
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(AMBIENT_VOLUME, now + AMBIENT_CROSSFADE_SECONDS);
+    gain.gain.exponentialRampToValueAtTime(targetGain, now + AMBIENT_CROSSFADE_SECONDS);
     source.connect(gain);
     gain.connect(context.destination);
     source.start(now);
@@ -942,34 +939,6 @@ export default function Home() {
     }
     await applyAmbientAudio(enabled, true);
   }, [applyAmbientAudio, initializeAudio]);
-
-  const beginVideoCrossfade = useCallback(async (fromLayer: 0 | 1) => {
-    if (videoTransitioningRef.current || activeVideoLayerRef.current !== fromLayer) return;
-    const fromVideo = sceneVideoRefs.current[fromLayer];
-    const toLayer = (fromLayer === 0 ? 1 : 0) as 0 | 1;
-    const toVideo = sceneVideoRefs.current[toLayer];
-    if (!fromVideo || !toVideo || toVideo.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
-
-    videoTransitioningRef.current = true;
-    toVideo.currentTime = 0;
-    toVideo.muted = true;
-    try {
-      await toVideo.play();
-    } catch {
-      videoTransitioningRef.current = false;
-      return;
-    }
-
-    activeVideoLayerRef.current = toLayer;
-    setActiveVideoLayer(toLayer);
-    if (videoTransitionTimerRef.current !== null) window.clearTimeout(videoTransitionTimerRef.current);
-    videoTransitionTimerRef.current = window.setTimeout(() => {
-      fromVideo.pause();
-      fromVideo.currentTime = 0;
-      videoTransitioningRef.current = false;
-      videoTransitionTimerRef.current = null;
-    }, VIDEO_CROSSFADE_SECONDS * 1000 + 120);
-  }, []);
 
   const clearAutoVisuals = useCallback(() => {
     autoVisualTimersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -1288,14 +1257,7 @@ export default function Home() {
     const option = SCENE_BY_ID.get(next) ?? SCENE_OPTIONS[0];
     const currentLocale = localeRef.current;
     sceneRef.current = next;
-    activeVideoLayerRef.current = 0;
-    videoTransitioningRef.current = false;
-    setActiveVideoLayer(0);
     setReadyVideoScene(null);
-    if (videoTransitionTimerRef.current !== null) {
-      window.clearTimeout(videoTransitionTimerRef.current);
-      videoTransitionTimerRef.current = null;
-    }
     setScene(next);
     setOpenMenu(null);
     particleLayerRef.current?.replaceChildren();
@@ -1425,41 +1387,8 @@ export default function Home() {
     if (ambientEnabledRef.current) void playAmbientScene(scene);
   }, [playAmbientScene, scene]);
 
-  useEffect(() => {
-    if (!videoEnabled) return;
-    const layer = activeVideoLayer;
-    const video = sceneVideoRefs.current[layer];
-    if (!video) return;
-
-    let frameCallbackId: number | null = null;
-    let animationFrameId: number | null = null;
-    const checkLoopBoundary = () => {
-      const remaining = video.duration - video.currentTime;
-      if (Number.isFinite(remaining) && remaining <= VIDEO_CROSSFADE_SECONDS && remaining > 0) {
-        void beginVideoCrossfade(layer);
-      }
-      if ("requestVideoFrameCallback" in video) {
-        frameCallbackId = video.requestVideoFrameCallback(checkLoopBoundary);
-      } else {
-        animationFrameId = window.requestAnimationFrame(checkLoopBoundary);
-      }
-    };
-
-    if ("requestVideoFrameCallback" in video) {
-      frameCallbackId = video.requestVideoFrameCallback(checkLoopBoundary);
-    } else {
-      animationFrameId = window.requestAnimationFrame(checkLoopBoundary);
-    }
-
-    return () => {
-      if (frameCallbackId !== null && "cancelVideoFrameCallback" in video) video.cancelVideoFrameCallback(frameCallbackId);
-      if (animationFrameId !== null) window.cancelAnimationFrame(animationFrameId);
-    };
-  }, [activeVideoLayer, beginVideoCrossfade, scene, videoEnabled]);
-
   useEffect(() => () => {
     if (autoSchedulerRef.current !== null) window.clearInterval(autoSchedulerRef.current);
-    if (videoTransitionTimerRef.current !== null) window.clearTimeout(videoTransitionTimerRef.current);
     autoVisualTimersRef.current.forEach((timer) => window.clearTimeout(timer));
     autoVoicesRef.current.forEach((voice) => {
       try {
@@ -1613,37 +1542,22 @@ export default function Home() {
     <main className={`app-shell sunroom ${immersiveMode ? "immersive" : ""} ${activeCodes.size ? "playing" : ""}`} data-scene={scene} data-locale={locale}>
       <div className="scene-background" key={`poster-${scene}`} style={{ backgroundImage: `url(${selectedScene.image})` }} aria-hidden="true" />
       {videoEnabled && (
-        <div className="scene-video-stack" aria-hidden="true">
-          {([0, 1] as const).map((layer) => (
-            <video
-              className={`scene-video ${readyVideoScene === scene ? "ready" : ""} ${activeVideoLayer === layer ? "active" : ""}`}
-              key={`${scene}-${layer}`}
-              src={selectedScene.video}
-              poster={selectedScene.image}
-              style={{ objectPosition: selectedScene.videoPosition }}
-              muted
-              playsInline
-              preload="auto"
-              disablePictureInPicture
-              tabIndex={-1}
-              ref={(element) => { sceneVideoRefs.current[layer] = element; }}
-              onCanPlay={(event) => {
-                event.currentTarget.muted = true;
-                if (activeVideoLayerRef.current === layer) {
-                  void event.currentTarget.play().then(() => setReadyVideoScene(scene)).catch(() => undefined);
-                } else {
-                  event.currentTarget.pause();
-                  event.currentTarget.currentTime = 0;
-                }
-              }}
-              onEnded={(event) => {
-                if (activeVideoLayerRef.current !== layer) return;
-                event.currentTarget.currentTime = 0;
-                void event.currentTarget.play().catch(() => undefined);
-              }}
-            />
-          ))}
-        </div>
+        <video
+          className={`scene-video ${readyVideoScene === scene ? "ready" : ""}`}
+          key={scene}
+          src={selectedScene.video}
+          poster={selectedScene.image}
+          style={{ objectPosition: selectedScene.videoPosition }}
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          disablePictureInPicture
+          tabIndex={-1}
+          onCanPlay={() => setReadyVideoScene(scene)}
+          aria-hidden="true"
+        />
       )}
       <div className="scene-light" aria-hidden="true" />
 

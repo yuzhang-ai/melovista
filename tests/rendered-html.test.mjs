@@ -109,11 +109,14 @@ test("MeloVista provides persistent Chinese and English interfaces", async () =>
   }
 });
 
-test("dynamic scenes crossfade dual muted videos and use independent seamless ambience", async () => {
+test("dynamic scenes use optimized muted ping-pong videos and independent seamless ambience", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   for (const file of ["coast.mp4", "mountain-lake.mp4", "rain-night.mp4", "twilight-city.mp4"]) {
     assert.match(source, new RegExp(`/video-scenes/${file.replace(".", "\\.")}`));
+    const video = await readFile(new URL(`../public/video-scenes/${file}`, import.meta.url));
+    assert.ok(video.byteLength > 3_000_000 && video.byteLength < 5_000_000);
+    assert.equal(video.includes(Buffer.from("mp4a")), false);
   }
   for (const file of ["coast.wav", "mountain-lake.wav", "rain-night.wav", "twilight-city.wav"]) {
     assert.match(source, new RegExp(`/audio/ambience/${file.replace(".", "\\.")}`));
@@ -122,20 +125,22 @@ test("dynamic scenes crossfade dual muted videos and use independent seamless am
     assert.equal(ambience.subarray(0, 4).toString("ascii"), "RIFF");
     assert.equal(ambience.subarray(8, 12).toString("ascii"), "WAVE");
   }
-  assert.match(source, /\(\[0, 1\] as const\)\.map/);
-  assert.match(source, /requestVideoFrameCallback/);
-  assert.match(source, /VIDEO_CROSSFADE_SECONDS = 1\.25/);
+  assert.match(source, /autoPlay[\s\S]*loop[\s\S]*muted[\s\S]*preload="auto"/);
+  assert.doesNotMatch(source, /requestVideoFrameCallback/);
+  assert.doesNotMatch(source, /VIDEO_CROSSFADE_SECONDS/);
   assert.match(source, /preload="auto"/);
   assert.match(source, /source\.loop = true/);
   assert.match(source, /AMBIENT_CROSSFADE_SECONDS = 0\.8/);
   assert.match(source, /const AMBIENT_VOLUME = 0\.28/);
+  assert.match(source, /id: "rain"[\s\S]*ambientGain: 0\.42/);
+  assert.match(source, /AMBIENT_VOLUME \* option\.ambientGain/);
   assert.match(source, /data-testid="ambient-toggle"/);
   assert.match(source, /ambientPreferenceRef\.current === "auto"/);
   assert.match(source, /void playAmbientScene\(sceneRef\.current\)/);
   assert.match(source, /matchMedia\("\(prefers-reduced-motion: reduce\)"\)/);
   assert.match(source, /readyVideoScene === scene/);
-  assert.match(styles, /\.scene-video-stack \{[\s\S]*overflow: hidden/);
-  assert.match(styles, /\.scene-video \{[\s\S]*object-fit: cover[\s\S]*transition: opacity 1\.25s linear/);
+  assert.doesNotMatch(styles, /\.scene-video-stack/);
+  assert.match(styles, /\.scene-video \{[\s\S]*object-fit: cover[\s\S]*transition: opacity 520ms ease/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.scene-video \{ display: none; \}/);
 });
 
