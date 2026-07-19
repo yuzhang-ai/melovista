@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import test from "node:test";
+
+const require = createRequire(import.meta.url);
 
 async function render() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -43,11 +46,39 @@ test("server-renders the immersive six-range piano", async () => {
   assert.match(html, /萨克斯/);
   assert.match(html, /沉浸演奏/);
   assert.match(html, /性能信息/);
+  assert.match(html, /钢琴曲库/);
+  assert.match(html, /圣诞快乐，劳伦斯先生/);
+  assert.match(html, /蒲公英的约定/);
+  assert.match(html, /致爱丽丝/);
+  assert.match(html, /你离开的事实/);
+  assert.match(html, /Call of Silence/);
   assert.match(html, /LEFT ALT/);
   assert.match(html, /data-testid="articulation-mode">短音/);
   assert.match(html, /Salamander Grand Piano V3/);
   assert.match(html, /tonejs-instruments/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
+});
+
+test("appreciation mode schedules public-domain MIDI while preserving local-only imports", async () => {
+  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const midiBuffer = await readFile(new URL("../public/midi/fur-elise.mid", import.meta.url));
+  const { Midi } = require("@tonejs/midi");
+  const midi = new Midi(midiBuffer);
+  const notes = midi.tracks.flatMap((track) => track.notes);
+
+  assert.ok(notes.length > 800);
+  assert.ok(midi.duration > 120);
+  assert.match(source, /midiUrl: "\/midi\/fur-elise\.mid"/);
+  assert.match(source, /setInterval\(tick, 25\)/);
+  assert.match(source, /const songHorizon = position \+ 0\.16 \* playback\.speed/);
+  assert.match(source, /source\.start\(startAt\)/);
+  assert.match(source, /spawnAutoNoteLight\(note\.midi\)/);
+  assert.match(source, /file\.arrayBuffer\(\)/);
+  const importHandler = source.slice(source.indexOf("const importLibraryMidi"), source.indexOf("const selectTimbre"));
+  assert.doesNotMatch(importHandler, /fetch\(|FormData|XMLHttpRequest/);
+  assert.match(source, /autoMidiCountsRef\.current\.set/);
+  assert.match(source, /data-testid="library-toggle"/);
+  assert.match(source, /\[0\.75, 1, 1\.25\]/);
 });
 
 test("MeloVista provides persistent Chinese and English interfaces", async () => {
@@ -107,7 +138,7 @@ test("the visual keyboard exposes all six octaves while keeping switchable group
   assert.match(source, /enabled=\{lowOctave === 3\}/);
   assert.match(source, /enabled=\{extremeOctave === 1\}/);
   assert.match(source, /enabled=\{extremeOctave === 6\}/);
-  assert.match(source, /const globalX = \(\(groupIndex \+ localX\) \/ 6\) \* 100/);
+  assert.match(source, /emitNoteLight\(\(\(groupIndex \+ localX\) \/ 6\) \* 100\)/);
 });
 
 test("short and long articulation use natural release envelopes", async () => {
