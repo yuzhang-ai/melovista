@@ -14,19 +14,21 @@ async function render() {
   );
 }
 
-test("server-renders the immersive three-octave piano", async () => {
+test("server-renders the immersive six-range piano", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>四景 · 三八度沉浸式钢琴<\/title>/i);
+  assert.match(html, /<title>四景 · 六音区沉浸式钢琴<\/title>/i);
   assert.match(html, /海岸午后/);
   assert.match(html, /加载并启动原声/);
   assert.match(html, /aria-label="高音区 C5 到 B5"/);
   assert.match(html, /aria-label="中音区 C4 到 B4"/);
   assert.match(html, /aria-label="可切换低音区 C3 到 B3"/);
-  assert.match(html, /aria-label="海岸午后三八度真实钢琴键盘与发光音符光尘"/);
+  assert.match(html, /aria-label="可切换扩展音区 C1 到 B1"/);
+  assert.match(html, /aria-label="海岸午后可切换六音区真实钢琴键盘与发光音符光尘"/);
+  assert.match(html, /NUM \+/);
   assert.match(html, /林间晴窗/);
   assert.match(html, /雨夜公寓/);
   assert.match(html, /星空露台/);
@@ -48,9 +50,23 @@ test("immersive mode suppresses non-piano keyboard events", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.match(source, /if \(immersiveModeRef\.current\)/);
   assert.match(source, /event\.stopImmediatePropagation\(\)/);
-  assert.match(source, /IMMERSIVE_CONTROL_CODES = new Set\(\["Space", "AltLeft"\]\)/);
+  assert.match(source, /IMMERSIVE_CONTROL_CODES = new Set\(\["Space", "AltLeft", "NumpadAdd"\]\)/);
   assert.match(source, /!KEY_BY_CODE\.has\(event\.code\) && !IMMERSIVE_CONTROL_CODES\.has\(event\.code\)/);
   assert.match(source, /navigator as KeyboardLockNavigator/);
+});
+
+test("navigation and numpad keys map the switchable C1 and C6 range", async () => {
+  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  for (const code of ["Insert", "Home", "PageUp", "NumLock", "NumpadDivide", "NumpadMultiply", "NumpadSubtract", "Delete", "End", "Numpad7", "Numpad8", "Numpad9"]) {
+    assert.match(source, new RegExp(`code: "${code}"`));
+  }
+  assert.match(source, /if \(event\.code === "NumpadAdd"\)/);
+  assert.match(source, /extremeOctaveRef\.current === 1 \? 6 : 1/);
+  assert.match(source, /midi: 24, file: "C1\.mp3"/);
+  assert.match(source, /midi: 84, file: "C6\.mp3"/);
+  assert.match(styles, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /height: 186px/);
 });
 
 test("short and long articulation use natural release envelopes", async () => {

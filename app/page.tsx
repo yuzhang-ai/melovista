@@ -7,7 +7,7 @@ type KeyDefinition = {
   label: string;
   semitone: number;
   accidental?: boolean;
-  group: "low" | "mid" | "high";
+  group: "extreme" | "low" | "mid" | "high";
 };
 
 type Articulation = "short" | "long";
@@ -110,9 +110,24 @@ const LOW_KEYS: KeyDefinition[] = [
   { code: "KeyN", label: "N", semitone: 10, accidental: true, group: "low" },
 ];
 
-const ALL_KEYS = [...LOW_KEYS, ...MID_KEYS, ...HIGH_KEYS];
+const EXTREME_KEYS: KeyDefinition[] = [
+  { code: "Insert", label: "Ins", semitone: 0, group: "extreme" },
+  { code: "Home", label: "Home", semitone: 2, group: "extreme" },
+  { code: "PageUp", label: "PgUp", semitone: 4, group: "extreme" },
+  { code: "NumLock", label: "Num", semitone: 5, group: "extreme" },
+  { code: "NumpadDivide", label: "/", semitone: 7, group: "extreme" },
+  { code: "NumpadMultiply", label: "*", semitone: 9, group: "extreme" },
+  { code: "NumpadSubtract", label: "−", semitone: 11, group: "extreme" },
+  { code: "Delete", label: "Del", semitone: 1, accidental: true, group: "extreme" },
+  { code: "End", label: "End", semitone: 3, accidental: true, group: "extreme" },
+  { code: "Numpad7", label: "7", semitone: 6, accidental: true, group: "extreme" },
+  { code: "Numpad8", label: "8", semitone: 8, accidental: true, group: "extreme" },
+  { code: "Numpad9", label: "9", semitone: 10, accidental: true, group: "extreme" },
+];
+
+const ALL_KEYS = [...EXTREME_KEYS, ...LOW_KEYS, ...MID_KEYS, ...HIGH_KEYS];
 const KEY_BY_CODE = new Map(ALL_KEYS.map((key) => [key.code, key]));
-const IMMERSIVE_CONTROL_CODES = new Set(["Space", "AltLeft"]);
+const IMMERSIVE_CONTROL_CODES = new Set(["Space", "AltLeft", "NumpadAdd"]);
 const NOTE_NAMES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
 const SHORT_RELEASE_TIME_CONSTANT_SECONDS = 0.72;
 const SHORT_RELEASE_STOP_SECONDS = 3;
@@ -123,6 +138,8 @@ const SAMPLE_BANKS: Record<SampleBankKey, SampleBank> = {
   acoustic: {
     basePath: "/audio/piano",
     samples: [
+      { midi: 24, file: "C1.mp3" }, { midi: 27, file: "Ds1.mp3" },
+      { midi: 30, file: "Fs1.mp3" }, { midi: 33, file: "A1.mp3" },
       { midi: 36, file: "C2.mp3" }, { midi: 39, file: "Ds2.mp3" },
       { midi: 42, file: "Fs2.mp3" }, { midi: 45, file: "A2.mp3" },
       { midi: 48, file: "C3.mp3" }, { midi: 51, file: "Ds3.mp3" },
@@ -131,6 +148,8 @@ const SAMPLE_BANKS: Record<SampleBankKey, SampleBank> = {
       { midi: 66, file: "Fs4.mp3" }, { midi: 69, file: "A4.mp3" },
       { midi: 72, file: "C5.mp3" }, { midi: 75, file: "Ds5.mp3" },
       { midi: 78, file: "Fs5.mp3" }, { midi: 81, file: "A5.mp3" },
+      { midi: 84, file: "C6.mp3" }, { midi: 87, file: "Ds6.mp3" },
+      { midi: 90, file: "Fs6.mp3" }, { midi: 93, file: "A6.mp3" },
     ],
   },
   violin: {
@@ -182,13 +201,13 @@ const SCENE_BY_ID = new Map(SCENE_OPTIONS.map((option) => [option.id, option]));
 const WHITE_KEY_INDEX = new Map([[0, 0], [2, 1], [4, 2], [5, 3], [7, 4], [9, 5], [11, 6]]);
 const BLACK_KEY_BOUNDARY = new Map([[1, 1], [3, 2], [6, 4], [8, 5], [10, 6]]);
 
-function keyToMidi(key: KeyDefinition, lowOctave: 2 | 3) {
-  const octave = key.group === "low" ? lowOctave : key.group === "mid" ? 4 : 5;
+function keyToMidi(key: KeyDefinition, lowOctave: 2 | 3, extremeOctave: 1 | 6) {
+  const octave = key.group === "extreme" ? extremeOctave : key.group === "low" ? lowOctave : key.group === "mid" ? 4 : 5;
   return 12 * (octave + 1) + key.semitone;
 }
 
-function keyToNote(key: KeyDefinition, lowOctave: 2 | 3) {
-  const octave = key.group === "low" ? lowOctave : key.group === "mid" ? 4 : 5;
+function keyToNote(key: KeyDefinition, lowOctave: 2 | 3, extremeOctave: 1 | 6) {
+  const octave = key.group === "extreme" ? extremeOctave : key.group === "low" ? lowOctave : key.group === "mid" ? 4 : 5;
   return `${NOTE_NAMES[key.semitone]}${octave}`;
 }
 
@@ -280,6 +299,7 @@ export default function Home() {
   const particleLayerRef = useRef<HTMLDivElement | null>(null);
   const controlDockRef = useRef<HTMLElement | null>(null);
   const lowOctaveRef = useRef<2 | 3>(3);
+  const extremeOctaveRef = useRef<1 | 6>(1);
   const articulationRef = useRef<Articulation>("short");
   const timbreRef = useRef<Timbre>("acoustic");
   const immersiveModeRef = useRef(false);
@@ -291,6 +311,7 @@ export default function Home() {
   const [sampleProgress, setSampleProgress] = useState(0);
   const [sampleTotal, setSampleTotal] = useState(SAMPLE_BANKS.acoustic.samples.length);
   const [lowOctave, setLowOctave] = useState<2 | 3>(3);
+  const [extremeOctave, setExtremeOctave] = useState<1 | 6>(1);
   const [articulation, setArticulation] = useState<Articulation>("short");
   const [timbre, setTimbre] = useState<Timbre>("acoustic");
   const [scene, setScene] = useState<SceneId>("coast");
@@ -342,11 +363,18 @@ export default function Home() {
     const layer = particleLayerRef.current;
     if (!layer) return;
 
-    const groupIndex = key.group === "low" ? 0 : key.group === "mid" ? 1 : 2;
+    const extremeIsLow = extremeOctaveRef.current === 1;
+    const groupIndex = key.group === "extreme"
+      ? (extremeIsLow ? 0 : 3)
+      : key.group === "low"
+        ? (extremeIsLow ? 1 : 0)
+        : key.group === "mid"
+          ? (extremeIsLow ? 2 : 1)
+          : (extremeIsLow ? 3 : 2);
     const localX = key.accidental
       ? (BLACK_KEY_BOUNDARY.get(key.semitone) ?? 0) / 7
       : ((WHITE_KEY_INDEX.get(key.semitone) ?? 0) + 0.5) / 7;
-    const globalX = ((groupIndex + localX) / 3) * 100;
+    const globalX = ((groupIndex + localX) / 4) * 100;
     const count = 9;
     const rise = Math.max(layer.clientHeight - 18, 280);
 
@@ -375,7 +403,7 @@ export default function Home() {
     const buffers = sampleLibrariesRef.current.get(currentTimbre.bank);
     if (!context || !master || !buffers || context.state !== "running") return false;
 
-    const midi = keyToMidi(key, lowOctaveRef.current);
+    const midi = keyToMidi(key, lowOctaveRef.current, extremeOctaveRef.current);
     const sample = nearestSample(midi, buffers, bank.samples);
     if (!sample) return false;
 
@@ -415,7 +443,7 @@ export default function Home() {
 
     setLastScheduleMs(scheduledMs);
     setP95ScheduleMs(percentile95(measurements));
-    setLastNote(`${keyToNote(key, lowOctaveRef.current)} · ${key.label} · ${currentTimbre.label} · ${articulationRef.current === "long" ? "长音" : "短音"}`);
+    setLastNote(`${keyToNote(key, lowOctaveRef.current, extremeOctaveRef.current)} · ${key.label} · ${currentTimbre.label} · ${articulationRef.current === "long" ? "长音" : "短音"}`);
     return true;
   }, [spawnNoteLight]);
 
@@ -619,6 +647,21 @@ export default function Home() {
         return;
       }
 
+      if (event.code === "NumpadAdd") {
+        event.preventDefault();
+        if (event.repeat) return;
+        EXTREME_KEYS.forEach((key) => {
+          releaseVoice(key.code, 0.08);
+          activeCodesRef.current.delete(key.code);
+        });
+        const nextOctave = extremeOctaveRef.current === 1 ? 6 : 1;
+        extremeOctaveRef.current = nextOctave;
+        setExtremeOctave(nextOctave);
+        setActiveCodes(new Set(activeCodesRef.current));
+        setLastNote(`扩展音区已切换到 C${nextOctave} — B${nextOctave}`);
+        return;
+      }
+
       const key = KEY_BY_CODE.get(event.code);
       if (!key) return;
       event.preventDefault();
@@ -627,7 +670,7 @@ export default function Home() {
       const eventStartedAt = performance.now();
       activeCodesRef.current.add(event.code);
       const started = startVoice(event.code, key, eventStartedAt);
-      if (!started) setLastNote(`${keyToNote(key, lowOctaveRef.current)} · 请先加载并启动当前音源`);
+      if (!started) setLastNote(`${keyToNote(key, lowOctaveRef.current, extremeOctaveRef.current)} · 请先加载并启动当前音源`);
       setActiveCodes(new Set(activeCodesRef.current));
     };
 
@@ -638,7 +681,7 @@ export default function Home() {
         if (!KEY_BY_CODE.has(event.code) && !IMMERSIVE_CONTROL_CODES.has(event.code)) return;
       }
 
-      if (event.code === "Space" || event.code === "AltLeft") {
+      if (event.code === "Space" || event.code === "AltLeft" || event.code === "NumpadAdd") {
         event.preventDefault();
         return;
       }
@@ -705,7 +748,7 @@ export default function Home() {
         <div className="brand-lockup">
           <span className="brand-mark" aria-hidden="true">≋</span>
           <div>
-            <h1>Three Octave Piano Lab</h1>
+            <h1>Six Octave Piano Lab</h1>
             <p>{selectedScene.label}的沉浸式琴房</p>
           </div>
         </div>
@@ -768,7 +811,7 @@ export default function Home() {
       {immersiveMode && (
         <div className="immersive-notice" role="status">
           <strong>沉浸模式</strong>
-          <span>仅琴键、Space 和左 Alt 响应</span>
+          <span>仅琴键、Space、小键盘 + 和左 Alt 响应</span>
         </div>
       )}
 
@@ -791,7 +834,7 @@ export default function Home() {
         </div>
       </aside>
 
-      <section className="instrument-panel" aria-label={`${selectedScene.label}三八度真实钢琴键盘与发光音符光尘`}>
+      <section className="instrument-panel" aria-label={`${selectedScene.label}可切换六音区真实钢琴键盘与发光音符光尘`}>
         <div className="instrument-scroll">
           <div className="instrument-stage">
             <div className="particle-surface" ref={particleLayerRef} aria-hidden="true" />
@@ -802,15 +845,19 @@ export default function Home() {
               <i className="level-bars" aria-hidden="true"><b /><b /><b /><b /></i>
             </div>
             <div className="piano-shell">
+              {extremeOctave === 1 && <PianoOctave title="可切换扩展音区" octave={extremeOctave} keys={EXTREME_KEYS} activeCodes={activeCodeSet} />}
               <PianoOctave title="可切换低音区" octave={lowOctave} keys={LOW_KEYS} activeCodes={activeCodeSet} />
               <PianoOctave title="中音区" octave={4} keys={MID_KEYS} activeCodes={activeCodeSet} />
               <PianoOctave title="高音区" octave={5} keys={HIGH_KEYS} activeCodes={activeCodeSet} />
+              {extremeOctave === 6 && <PianoOctave title="可切换扩展音区" octave={extremeOctave} keys={EXTREME_KEYS} activeCodes={activeCodeSet} />}
             </div>
           </div>
         </div>
       </section>
 
       <footer className="key-hints">
+        <span><kbd>NUM +</kbd> 扩展音区 C{extremeOctave}</span>
+        <i />
         <span><kbd>SPACE</kbd> 低音区 C{lowOctave}</span>
         <i />
         <span><kbd>LEFT ALT</kbd> {articulation === "long" ? "长音" : "短音"}</span>

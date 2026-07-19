@@ -289,7 +289,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
 .instrument-scroll { width: 100%; height: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; pointer-events: auto; }
 .instrument-scroll::-webkit-scrollbar { display: none; }
 .instrument-stage { position: relative; min-width: 1060px; height: 100svh; min-height: 690px; overflow: hidden; }
-.particle-surface { position: absolute; z-index: 8; top: 110px; right: 0; bottom: 270px; left: 0; overflow: visible; pointer-events: none; }
+.particle-surface { position: absolute; z-index: 8; top: 110px; right: 0; bottom: 210px; left: 0; overflow: visible; pointer-events: none; }
 
 .note-spark {
   position: absolute;
@@ -318,7 +318,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
   position: absolute;
   z-index: 13;
   right: 36px;
-  bottom: 298px;
+  bottom: 238px;
   display: flex;
   align-items: center;
   gap: 0;
@@ -352,55 +352,55 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
   position: absolute;
   z-index: 12;
   right: 16px;
-  bottom: 45px;
+  bottom: 40px;
   left: 16px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  height: 246px;
-  padding: 11px 10px 7px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  height: 186px;
+  padding: 9px 8px 6px;
   border: 1px solid rgba(255, 245, 215, 0.18);
   border-radius: 12px 12px 4px 4px;
   background: linear-gradient(180deg, rgba(25, 18, 13, 0.96), rgba(6, 5, 4, 0.98));
   box-shadow: 0 23px 40px rgba(0, 0, 0, 0.52), inset 0 1px rgba(255, 255, 255, 0.09), 0 -8px 26px rgba(255, 181, 50, 0.06);
 }
-.piano-octave { position: relative; height: 226px; padding-bottom: 23px; }
+.piano-octave { position: relative; height: 170px; padding-bottom: 20px; }
 .piano-octave + .piano-octave { border-left: 2px solid rgba(38, 30, 22, 0.72); }
-.white-keys { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); height: 203px; }
+.white-keys { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); height: 150px; }
 .piano-key { user-select: none; transition: transform 52ms ease, background 65ms ease, box-shadow 65ms ease, border-color 65ms ease; }
 .piano-key.white {
   position: relative;
   min-width: 0;
-  height: 203px;
+  height: 150px;
   border: 1px solid #b7b0a5;
   border-top-color: #f9f5eb;
-  border-radius: 0 0 6px 6px;
+  border-radius: 0 0 5px 5px;
   background: linear-gradient(90deg, #fffdf8, #ece8de 77%, #c9c1b6);
-  box-shadow: inset 0 -14px 20px rgba(88, 72, 53, 0.11), inset 0 3px 3px white, 0 5px 0 #81786e;
+  box-shadow: inset 0 -10px 16px rgba(88, 72, 53, 0.11), inset 0 3px 3px white, 0 4px 0 #81786e;
 }
 .piano-key.black {
   position: absolute;
   z-index: 3;
   top: 0;
   width: 9.2%;
-  height: 128px;
+  height: 94px;
   transform: translateX(-50%);
   border: 1px solid #020202;
   border-radius: 0 0 5px 5px;
   background: linear-gradient(90deg, #080705, #302a24 62%, #060504);
-  box-shadow: inset 0 -12px 14px rgba(103, 81, 52, 0.18), inset 0 2px rgba(255, 255, 255, 0.09), 0 7px 0 #000, 0 10px 13px rgba(0, 0, 0, 0.52);
+  box-shadow: inset 0 -9px 12px rgba(103, 81, 52, 0.18), inset 0 2px rgba(255, 255, 255, 0.09), 0 5px 0 #000, 0 8px 11px rgba(0, 0, 0, 0.52);
 }
-.piano-key-label { position: absolute; right: 4px; bottom: 11px; left: 4px; display: flex; flex-direction: column; align-items: center; gap: 5px; opacity: 0.5; transition: opacity 100ms ease; }
-.piano-key-label kbd { min-width: 25px; padding: 4px; color: #574f45; font: 780 9px/1 var(--font-geist-mono), monospace; text-align: center; border: 1px solid rgba(80, 67, 50, 0.18); border-radius: 4px; background: rgba(255, 255, 255, 0.52); }
-.piano-key-label span { color: #8d8275; font: 650 7px/1 var(--font-geist-mono), monospace; }
-.piano-key.black .piano-key-label { bottom: 10px; opacity: 0.56; }
-.piano-key.black .piano-key-label kbd { min-width: 22px; padding: 3px; color: #eee7dc; font-size: 8px; border-color: rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.08); }
-.piano-key.black .piano-key-label span { color: #9c9287; font-size: 7px; }
-.piano-key.white.active { transform: translateY(4px); border-color: #ffd267; background: linear-gradient(180deg, #fffdf4, #ffe49a 78%, #eeb646); box-shadow: inset 0 0 30px rgba(255, 196, 60, 0.24), 0 1px 0 #9b7225, 0 0 30px rgba(255, 189, 47, 0.72); }
-.piano-key.black.active { transform: translate(-50%, 4px); border-color: #ffd56d; background: linear-gradient(90deg, #211306, #a96812 60%, #140c05); box-shadow: inset 0 0 24px rgba(255, 215, 102, 0.3), 0 3px 0 #120900, 0 0 28px rgba(255, 185, 46, 0.72); }
+.piano-key-label { position: absolute; right: 3px; bottom: 8px; left: 3px; display: flex; flex-direction: column; align-items: center; gap: 4px; opacity: 0.5; transition: opacity 100ms ease; }
+.piano-key-label kbd { min-width: 22px; padding: 3px; color: #574f45; font: 780 8px/1 var(--font-geist-mono), monospace; text-align: center; border: 1px solid rgba(80, 67, 50, 0.18); border-radius: 4px; background: rgba(255, 255, 255, 0.52); }
+.piano-key-label span { color: #8d8275; font: 650 6px/1 var(--font-geist-mono), monospace; }
+.piano-key.black .piano-key-label { bottom: 7px; opacity: 0.56; }
+.piano-key.black .piano-key-label kbd { min-width: 19px; padding: 2px; color: #eee7dc; font-size: 7px; border-color: rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.08); }
+.piano-key.black .piano-key-label span { color: #9c9287; font-size: 6px; }
+.piano-key.white.active { transform: translateY(3px); border-color: #ffd267; background: linear-gradient(180deg, #fffdf4, #ffe49a 78%, #eeb646); box-shadow: inset 0 0 30px rgba(255, 196, 60, 0.24), 0 1px 0 #9b7225, 0 0 30px rgba(255, 189, 47, 0.72); }
+.piano-key.black.active { transform: translate(-50%, 3px); border-color: #ffd56d; background: linear-gradient(90deg, #211306, #a96812 60%, #140c05); box-shadow: inset 0 0 24px rgba(255, 215, 102, 0.3), 0 3px 0 #120900, 0 0 28px rgba(255, 185, 46, 0.72); }
 .piano-key.active .piano-key-label { opacity: 1; }
 .piano-key.active .piano-key-label kbd { color: #533506; background: #fff1bd; }
 .piano-key.active .piano-key-label span { color: #8b5c0d; }
-.octave-caption { position: absolute; right: 0; bottom: 2px; left: 0; color: rgba(255, 243, 216, 0.36); font: 620 7px/1 var(--font-geist-mono), monospace; letter-spacing: 0.08em; text-align: center; text-transform: uppercase; }
+.octave-caption { position: absolute; right: 0; bottom: 2px; left: 0; color: rgba(255, 243, 216, 0.36); font: 620 6px/1 var(--font-geist-mono), monospace; letter-spacing: 0.06em; text-align: center; text-transform: uppercase; }
 
 .key-hints {
   position: absolute;
@@ -411,8 +411,8 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 22px;
-  height: 38px;
+  gap: 16px;
+  height: 36px;
   color: rgba(255, 255, 255, 0.68);
   font-size: 8px;
   background: rgba(12, 9, 7, 0.78);
@@ -439,7 +439,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
   .control-dock { justify-content: flex-start; flex-wrap: wrap; max-width: calc(100vw - 28px); overflow: visible; border-radius: 18px; }
   .dock-item, .dock-button { flex: none; }
   .performance-drawer { top: 154px; right: 12px; }
-  .performance-pill { right: 16px; bottom: 300px; min-width: 300px; }
+  .performance-pill { right: 16px; bottom: 240px; min-width: 300px; }
   .performance-pill > div { min-width: 68px; }
   .performance-pill .current-note { display: none; }
   .scene-background { background-position: 54% center; }
