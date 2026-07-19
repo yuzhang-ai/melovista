@@ -13,8 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "三八度沉浸式键盘钢琴",
-  description: "使用电脑键盘弹奏三八度真实采样音色，支持发光气泡、五种音色以及长短音切换。",
+  title: "海岸午后 · 三八度沉浸式钢琴",
+  description: "在阳光海景琴房中使用电脑键盘演奏三八度真实采样音色。",
+  openGraph: {
+    title: "海岸午后 · 三八度沉浸式钢琴",
+    description: "阳光、海风与真实采样钢琴，一间可以安静停留和演奏的虚拟琴房。",
+    images: ["/scenes/coast-afternoon-v1.webp"],
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

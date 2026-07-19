@@ -259,7 +259,7 @@ export default function Home() {
   const sampleLibrariesRef = useRef(new Map<SampleBankKey, Map<number, AudioBuffer>>());
   const voicesRef = useRef(new Map<string, Voice>());
   const activeCodesRef = useRef(new Set<string>());
-  const bubbleLayerRef = useRef<HTMLDivElement | null>(null);
+  const particleLayerRef = useRef<HTMLDivElement | null>(null);
   const lowOctaveRef = useRef<2 | 3>(3);
   const articulationRef = useRef<Articulation>("short");
   const timbreRef = useRef<Timbre>("acoustic");
@@ -275,6 +275,7 @@ export default function Home() {
   const [articulation, setArticulation] = useState<Articulation>("short");
   const [timbre, setTimbre] = useState<Timbre>("acoustic");
   const [immersiveMode, setImmersiveMode] = useState(false);
+  const [showPerformance, setShowPerformance] = useState(false);
   const [activeCodes, setActiveCodes] = useState<Set<string>>(new Set());
   const [lastNote, setLastNote] = useState("等待加载原声音源");
   const [lastScheduleMs, setLastScheduleMs] = useState(0);
@@ -316,8 +317,8 @@ export default function Home() {
     setLastNote(`已切换到${next === "long" ? "长音" : "短音"}模式`);
   }, []);
 
-  const spawnBubbles = useCallback((key: KeyDefinition) => {
-    const layer = bubbleLayerRef.current;
+  const spawnNoteLight = useCallback((key: KeyDefinition) => {
+    const layer = particleLayerRef.current;
     if (!layer) return;
 
     const groupIndex = key.group === "low" ? 0 : key.group === "mid" ? 1 : 2;
@@ -325,23 +326,24 @@ export default function Home() {
       ? (BLACK_KEY_BOUNDARY.get(key.semitone) ?? 0) / 7
       : ((WHITE_KEY_INDEX.get(key.semitone) ?? 0) + 0.5) / 7;
     const globalX = ((groupIndex + localX) / 3) * 100;
-    const hue = 178 + key.semitone * 7;
+    const isLow = key.group === "low";
+    const count = isLow ? 5 : key.group === "high" ? 8 : 7;
 
-    [0, 1].forEach((index) => {
-      const bubble = document.createElement("i");
-      const size = index === 0 ? 25 + Math.random() * 22 : 8 + Math.random() * 10;
-      bubble.className = "water-bubble";
-      bubble.style.left = `calc(${globalX}% + ${(Math.random() - 0.5) * 18}px)`;
-      bubble.style.setProperty("--bubble-size", `${size}px`);
-      bubble.style.setProperty("--bubble-drift", `${(Math.random() - 0.5) * 90}px`);
-      bubble.style.setProperty("--bubble-hue", `${hue}`);
-      bubble.style.setProperty("--bubble-duration", `${2.6 + Math.random() * 1.2}s`);
-      bubble.style.setProperty("--bubble-delay", `${index * 80}ms`);
-      bubble.addEventListener("animationend", () => bubble.remove(), { once: true });
-      layer.appendChild(bubble);
+    Array.from({ length: count }).forEach((_, index) => {
+      const spark = document.createElement("i");
+      const size = isLow ? 4 + Math.random() * 6 : 2 + Math.random() * 4;
+      spark.className = `note-spark ${index === 0 ? "note-core" : ""}`;
+      spark.style.left = `calc(${globalX}% + ${(Math.random() - 0.5) * (isLow ? 28 : 18)}px)`;
+      spark.style.setProperty("--spark-size", `${size}px`);
+      spark.style.setProperty("--spark-drift", `${(Math.random() - 0.46) * (isLow ? 80 : 130)}px`);
+      spark.style.setProperty("--spark-rise", `${isLow ? 110 + Math.random() * 90 : 190 + Math.random() * 150}px`);
+      spark.style.setProperty("--spark-duration", `${isLow ? 2.2 + Math.random() : 1.6 + Math.random() * 1.1}s`);
+      spark.style.setProperty("--spark-delay", `${index * 24}ms`);
+      spark.addEventListener("animationend", () => spark.remove(), { once: true });
+      layer.appendChild(spark);
     });
 
-    while (layer.childElementCount > 80) layer.firstElementChild?.remove();
+    while (layer.childElementCount > 140) layer.firstElementChild?.remove();
   }, []);
 
   const startVoice = useCallback((code: string, key: KeyDefinition, eventStartedAt: number) => {
@@ -377,7 +379,7 @@ export default function Home() {
     }
 
     source.start(now);
-    spawnBubbles(key);
+    spawnNoteLight(key);
 
     const voice = { source, gain };
     voicesRef.current.set(code, voice);
@@ -394,7 +396,7 @@ export default function Home() {
     setP95ScheduleMs(percentile95(measurements));
     setLastNote(`${keyToNote(key, lowOctaveRef.current)} · ${key.label} · ${currentTimbre.label} · ${articulationRef.current === "long" ? "长音" : "短音"}`);
     return true;
-  }, [spawnBubbles]);
+  }, [spawnNoteLight]);
 
   const ensureSampleBank = useCallback(async (context: AudioContext, bankKey: SampleBankKey) => {
     const existing = sampleLibrariesRef.current.get(bankKey);
@@ -640,94 +642,92 @@ export default function Home() {
             : `加载并启动${selectedTimbre.label}`;
 
   return (
-    <main className={`app-shell ${immersiveMode ? "immersive" : ""}`}>
-      <header className="hero">
-        <div>
-          <div className="brand-line"><span className="status-dot" /> SAMPLE ENGINE · AQUA VISUAL</div>
-          <h1>三八度沉浸式键盘钢琴</h1>
-          <p>真实键盘布局、五种采样音色与水中发光气泡；声音先调度，视觉随后生成。</p>
+    <main className={`app-shell sunroom ${immersiveMode ? "immersive" : ""} ${activeCodes.size ? "playing" : ""}`}>
+      <div className="scene-background" aria-hidden="true" />
+      <div className="scene-light" aria-hidden="true" />
+
+      <header className="floating-header">
+        <div className="brand-lockup">
+          <span className="brand-mark" aria-hidden="true">≋</span>
+          <div>
+            <h1>Three Octave Piano Lab</h1>
+            <p>海岸午后的沉浸式琴房</p>
+          </div>
         </div>
-        <button className={`audio-button ${isAudioReady ? "ready" : ""}`} onClick={initializeAudio} disabled={audioStatus === "loading"} data-testid="start-audio">
-          <span>{audioButtonText}</span>
-          <small>{audioStatus === "running" ? `当前：${articulation === "long" ? "长音" : "短音"}模式` : "音色按需加载，加载后演奏不再请求网络"}</small>
+
+        <nav className="control-dock" aria-label="演奏控制">
+          <div className="dock-item scene-item">
+            <span className="dock-icon" aria-hidden="true">☀</span>
+            <span><small>场景</small>海岸午后</span>
+          </div>
+          <label className="dock-item timbre-select">
+            <span className="dock-icon" aria-hidden="true">♩</span>
+            <span><small>音色</small></span>
+            <select
+              value={timbre}
+              disabled={audioStatus === "loading"}
+              onChange={(event) => void selectTimbre(event.target.value as Timbre)}
+              aria-label="选择音色"
+            >
+              {TIMBRE_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+            </select>
+          </label>
+          <button className={`dock-button ${articulation === "long" ? "active" : ""}`} type="button" onClick={toggleArticulation} data-testid="articulation-toggle">
+            <span className="dock-icon" aria-hidden="true">⌁</span>
+            <span><small>延音</small><b data-testid="articulation-mode">{articulation === "long" ? "长音" : "短音"}</b></span>
+          </button>
+          <button className={`dock-button ${immersiveMode ? "active" : ""}`} type="button" aria-pressed={immersiveMode} onClick={toggleImmersiveMode} data-testid="immersive-toggle">
+            <span className="dock-icon" aria-hidden="true">◎</span>
+            <span><small>模式</small><b>{immersiveMode ? "退出沉浸" : "沉浸演奏"}</b></span>
+          </button>
+          <button className={`dock-button ${showPerformance ? "active" : ""}`} type="button" aria-pressed={showPerformance} onClick={() => setShowPerformance((value) => !value)}>
+            <span className="dock-icon" aria-hidden="true">⋯</span>
+            <span><small>更多</small><b>性能信息</b></span>
+          </button>
+        </nav>
+
+        <button className={`audio-status ${isAudioReady ? "ready" : ""}`} onClick={initializeAudio} disabled={audioStatus === "loading"} data-testid="start-audio">
+          <i />
+          <span>{audioButtonText}<small>{audioStatus === "running" ? `${selectedTimbre.label} · ${articulation === "long" ? "长音" : "短音"}` : "点击启用音频引擎"}</small></span>
         </button>
       </header>
 
-      <section className="timbre-panel" aria-label="音色选择">
-        <div className="timbre-copy">
-          <span className="eyebrow">音色</span>
-          <strong>选择你的演奏质感</strong>
-          <small>首次选择小提琴、吉他或萨克斯时会单独加载</small>
+      {immersiveMode && (
+        <div className="immersive-notice" role="status">
+          <strong>沉浸模式</strong>
+          <span>仅琴键、Space 和左 Alt 响应</span>
         </div>
-        <div className="timbre-options" role="group" aria-label="可用音色">
-          {TIMBRE_OPTIONS.map((option) => (
-            <button
-              type="button"
-              key={option.id}
-              className={`timbre-option ${timbre === option.id ? "active" : ""}`}
-              aria-pressed={timbre === option.id}
-              disabled={audioStatus === "loading"}
-              onClick={() => void selectTimbre(option.id)}
-            >
-              <span>{option.label}</span>
-              <small>{option.detail}</small>
-            </button>
-          ))}
-        </div>
-      </section>
+      )}
 
-      <section className="diagnostics" aria-label="延迟诊断">
-        <div className="metric primary">
-          <span>最近一次 JS 调度</span>
-          <strong data-testid="last-schedule">{lastScheduleMs.toFixed(2)}<em> ms</em></strong>
+      <aside className={`performance-drawer ${showPerformance ? "open" : ""}`} aria-hidden={!showPerformance}>
+        <div className="drawer-heading">
+          <div><small>PERFORMANCE</small><strong>性能信息</strong></div>
+          <button type="button" onClick={() => setShowPerformance(false)} aria-label="关闭性能信息">×</button>
         </div>
-        <div className="metric">
-          <span>最近 120 次 P95</span>
-          <strong data-testid="p95-schedule">{p95ScheduleMs.toFixed(2)}<em> ms</em></strong>
+        <dl>
+          <div><dt>最近 JS 调度</dt><dd>{lastScheduleMs.toFixed(2)} ms</dd></div>
+          <div><dt>120 次 P95</dt><dd>{p95ScheduleMs.toFixed(2)} ms</dd></div>
+          <div><dt>浏览器基础延迟</dt><dd>{diagnostics ? `${(diagnostics.baseLatency * 1000).toFixed(1)} ms` : "—"}</dd></div>
+          <div><dt>输出延迟</dt><dd>{diagnostics?.outputLatency != null ? `${(diagnostics.outputLatency * 1000).toFixed(1)} ms` : "—"}</dd></div>
+          <div><dt>采样率</dt><dd>{diagnostics ? `${diagnostics.sampleRate} Hz` : "—"}</dd></div>
+          <div><dt>当前操作</dt><dd data-testid="last-note">{lastNote}</dd></div>
+        </dl>
+        <p>声音始终先于视觉粒子调度。蓝牙设备仍会产生额外硬件延迟。</p>
+        <div className="sample-credit">
+          Samples: <a href="https://github.com/sfzinstruments/SalamanderGrandPiano" target="_blank" rel="noreferrer">Salamander Grand Piano V3</a> · <a href="https://nbrosowsky.github.io/tonejs-instruments/" target="_blank" rel="noreferrer">tonejs-instruments</a> · CC BY 3.0
         </div>
-        <div className="metric">
-          <span>浏览器基础音频延迟</span>
-          <strong>{diagnostics ? (diagnostics.baseLatency * 1000).toFixed(1) : "—"}<em> ms</em></strong>
-        </div>
-        <div className="metric">
-          <span>当前音 / 操作</span>
-          <strong className="last-note" data-testid="last-note">{lastNote}</strong>
-        </div>
-      </section>
+      </aside>
 
-      <p className="measurement-note">键帽上方是电脑按键，下方是音高。建议使用内置扬声器或有线耳机；蓝牙设备会额外增加硬件延迟。</p>
-
-      <section className="instrument-panel" aria-label="三八度真实钢琴键盘与水中发光气泡">
-        <div className="instrument-heading">
-          <div>
-            <span className="eyebrow">演奏区</span>
-            <h2>按键亮起，气泡随音高上浮</h2>
-          </div>
-          <div className="instrument-actions">
-            <span className="live-pill"><i /> LIVE</span>
-            <button
-              className={`immersive-toggle ${immersiveMode ? "active" : ""}`}
-              type="button"
-              aria-pressed={immersiveMode}
-              onClick={toggleImmersiveMode}
-              data-testid="immersive-toggle"
-            >
-              <span>{immersiveMode ? "退出沉浸模式" : "进入沉浸模式"}</span>
-              <small>{immersiveMode ? "琴键与控制响应" : "屏蔽无关按键误触"}</small>
-            </button>
-          </div>
-        </div>
-        {immersiveMode && (
-          <div className="immersive-notice" role="status">
-            <strong>沉浸模式已开启</strong>
-            <span>36 个琴键、Space 音区切换和左 Alt 长短音切换保持可用，其他按键均已停用；请点击上方按钮退出。</span>
-          </div>
-        )}
+      <section className="instrument-panel" aria-label="海岸午后三八度真实钢琴键盘与金色音符光尘">
         <div className="instrument-scroll">
           <div className="instrument-stage">
-            <div className="water-rays" aria-hidden="true" />
-            <div className="bubble-surface" ref={bubbleLayerRef} aria-hidden="true" />
-            <div className="waterline" aria-hidden="true" />
+            <div className="particle-surface" ref={particleLayerRef} aria-hidden="true" />
+            <div className="performance-pill" aria-label="实时演奏信息">
+              <div><span>调度</span><strong data-testid="last-schedule">{lastScheduleMs.toFixed(2)}<small> ms</small></strong></div>
+              <div><span>P95</span><strong data-testid="p95-schedule">{p95ScheduleMs.toFixed(2)}<small> ms</small></strong></div>
+              <div className="current-note"><span>当前音</span><strong>{lastNote.split("·")[0].trim()}</strong></div>
+              <i className="level-bars" aria-hidden="true"><b /><b /><b /><b /></i>
+            </div>
             <div className="piano-shell">
               <PianoOctave title="可切换低音区" octave={lowOctave} keys={LOW_KEYS} activeCodes={activeCodeSet} />
               <PianoOctave title="中音区" octave={4} keys={MID_KEYS} activeCodes={activeCodeSet} />
@@ -737,28 +737,13 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="performance-controls">
-        <section className="control-card">
-          <div>
-            <span className="eyebrow">低音区切换</span>
-            <strong>C{lowOctave} — B{lowOctave}</strong>
-          </div>
-          <kbd>SPACE</kbd>
-          <p>每按一次，在 C3 与 C2 之间切换</p>
-        </section>
-        <button className={`control-card articulation ${articulation}`} type="button" onClick={toggleArticulation} data-testid="articulation-toggle">
-          <div>
-            <span className="eyebrow">发音长度</span>
-            <strong data-testid="articulation-mode">{articulation === "long" ? "长音模式" : "短音模式"}</strong>
-          </div>
-          <kbd>LEFT ALT</kbd>
-          <p>{articulation === "long" ? "松键后缓慢衰减，尾音可自然延续约 6—9 秒" : "松键后保留约 2—3 秒尾音，清晰但不生硬"}</p>
-        </button>
+      <footer className="key-hints">
+        <span><kbd>SPACE</kbd> 低音区 C{lowOctave}</span>
+        <i />
+        <span><kbd>LEFT ALT</kbd> {articulation === "long" ? "长音" : "短音"}</span>
+        <i />
+        <span>建议使用有线耳机获得最佳体验</span>
       </footer>
-
-      <p className="sample-credit">
-        Piano: <a href="https://github.com/sfzinstruments/SalamanderGrandPiano" target="_blank" rel="noreferrer">Salamander Grand Piano V3</a> · Other instruments: <a href="https://nbrosowsky.github.io/tonejs-instruments/" target="_blank" rel="noreferrer">tonejs-instruments</a> · CC BY 3.0
-      </p>
     </main>
   );
 }

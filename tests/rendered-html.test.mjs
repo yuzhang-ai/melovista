@@ -20,20 +20,20 @@ test("server-renders the immersive three-octave piano", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>三八度沉浸式键盘钢琴<\/title>/i);
-  assert.match(html, /三八度沉浸式键盘钢琴/);
+  assert.match(html, /<title>海岸午后 · 三八度沉浸式钢琴<\/title>/i);
+  assert.match(html, /海岸午后的沉浸式琴房/);
   assert.match(html, /加载并启动原声/);
   assert.match(html, /aria-label="高音区 C5 到 B5"/);
   assert.match(html, /aria-label="中音区 C4 到 B4"/);
   assert.match(html, /aria-label="可切换低音区 C3 到 B3"/);
-  assert.match(html, /aria-label="三八度真实钢琴键盘与水中发光气泡"/);
+  assert.match(html, /aria-label="海岸午后三八度真实钢琴键盘与金色音符光尘"/);
   assert.match(html, /钢丝弦吉他/);
   assert.match(html, /小提琴/);
   assert.match(html, /萨克斯/);
-  assert.match(html, /进入沉浸模式/);
-  assert.match(html, /屏蔽无关按键误触/);
+  assert.match(html, /沉浸演奏/);
+  assert.match(html, /性能信息/);
   assert.match(html, /LEFT ALT/);
-  assert.match(html, /短音模式/);
+  assert.match(html, /data-testid="articulation-mode">短音/);
   assert.match(html, /Salamander Grand Piano V3/);
   assert.match(html, /tonejs-instruments/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
@@ -55,4 +55,14 @@ test("short and long articulation use natural release envelopes", async () => {
   assert.match(source, /LONG_RELEASE_TIME_CONSTANT_SECONDS = 1\.8/);
   assert.match(source, /LONG_RELEASE_STOP_SECONDS = 9/);
   assert.match(source, /setTargetAtTime\(0\.0001, now, timeConstant\)/);
+});
+
+test("audio starts before the scene creates note particles", async () => {
+  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const audioStart = source.indexOf("source.start(now);");
+  const visualStart = source.indexOf("spawnNoteLight(key);", audioStart);
+
+  assert.notEqual(audioStart, -1);
+  assert.notEqual(visualStart, -1);
+  assert.ok(audioStart < visualStart);
 });
