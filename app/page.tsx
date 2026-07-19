@@ -298,7 +298,7 @@ export default function Home() {
   const activeCodesRef = useRef(new Set<string>());
   const particleLayerRef = useRef<HTMLDivElement | null>(null);
   const controlDockRef = useRef<HTMLElement | null>(null);
-  const lowOctaveRef = useRef<2 | 3>(3);
+  const lowOctaveRef = useRef<2 | 3>(2);
   const extremeOctaveRef = useRef<1 | 6>(1);
   const articulationRef = useRef<Articulation>("short");
   const timbreRef = useRef<Timbre>("acoustic");
@@ -310,7 +310,7 @@ export default function Home() {
   const [audioStatus, setAudioStatus] = useState<AudioStatus>("idle");
   const [sampleProgress, setSampleProgress] = useState(0);
   const [sampleTotal, setSampleTotal] = useState(SAMPLE_BANKS.acoustic.samples.length);
-  const [lowOctave, setLowOctave] = useState<2 | 3>(3);
+  const [lowOctave, setLowOctave] = useState<2 | 3>(2);
   const [extremeOctave, setExtremeOctave] = useState<1 | 6>(1);
   const [articulation, setArticulation] = useState<Articulation>("short");
   const [timbre, setTimbre] = useState<Timbre>("acoustic");

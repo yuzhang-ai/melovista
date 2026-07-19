@@ -25,7 +25,7 @@ test("server-renders the immersive six-range piano", async () => {
   assert.match(html, /加载并启动原声/);
   assert.match(html, /aria-label="高音区 C5 到 B5"/);
   assert.match(html, /aria-label="中音区 C4 到 B4"/);
-  assert.match(html, /aria-label="可切换低音区 C3 到 B3"/);
+  assert.match(html, /aria-label="可切换低音区 C2 到 B2"/);
   assert.match(html, /aria-label="可切换扩展音区 C1 到 B1"/);
   assert.match(html, /aria-label="海岸午后可切换六音区真实钢琴键盘与发光音符光尘"/);
   assert.match(html, /NUM \+/);
@@ -67,6 +67,12 @@ test("navigation and numpad keys map the switchable C1 and C6 range", async () =
   assert.match(source, /midi: 84, file: "C6\.mp3"/);
   assert.match(styles, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(styles, /height: 186px/);
+});
+
+test("the default visual keyboard exposes a continuous C1 through B2 range", async () => {
+  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(source, /lowOctaveRef = useRef<2 \| 3>\(2\)/);
+  assert.match(source, /\[lowOctave, setLowOctave\] = useState<2 \| 3>\(2\)/);
 });
 
 test("short and long articulation use natural release envelopes", async () => {

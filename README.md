@@ -39,7 +39,7 @@ npm.cmd run dev
 - C3–B3 半音：`Z X V B N`
 - C1–B1 全音：`Insert Home PageUp NumLock Numpad / * -`
 - C1–B1 半音：`Delete End Numpad 7 8 9`
-- `Space`：将最低一组在 C3–B3 与 C2–B2 间切换
+- `Space`：将低音组在 C2–B2 与 C3–B3 间切换，默认显示 C2，使左侧与 C1 组成连续的 C1–B2 可视范围
 - 小键盘 `+`：将扩展组在 C1–B1 与 C6–B6 间切换；切换到 C6 时该组移动到键盘最右侧
 - 左侧 `Alt`：在短音与长音之间切换；短音尾音约 2–3 秒，长音尾音最长约 9 秒；右侧 Alt 不响应
 
