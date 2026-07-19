@@ -390,7 +390,7 @@ const TIMBRE_OPTIONS: TimbreOption[] = [
 const SCENE_OPTIONS: SceneOption[] = [
   { id: "coast", label: { zh: "沧海听风", en: "Sea Breeze" }, detail: { zh: "海风与暖阳", en: "Ocean air & warm sunlight" }, icon: "☀", image: "/scenes/coast-video-poster.jpg", video: "/video-scenes/coast.mp4", ambience: "/audio/ambience/coast.wav", ambientGain: 1, videoPosition: "50% 58%" },
   { id: "forest", label: { zh: "山湖静语", en: "Alpine Stillness" }, detail: { zh: "湖面与雪峰", en: "Lake & snow peaks" }, icon: "☘", image: "/scenes/mountain-lake-video-poster.jpg", video: "/video-scenes/mountain-lake.mp4", ambience: "/audio/ambience/mountain-lake.wav", ambientGain: 1, videoPosition: "50% 62%" },
-  { id: "rain", label: { zh: "雨夜伴灯", en: "Rainlight Night" }, detail: { zh: "雨幕与暖灯", en: "Rainfall & lamplight" }, icon: "☂", image: "/scenes/rain-night-video-poster.jpg", video: "/video-scenes/rain-night.mp4", ambience: "/audio/ambience/rain-night.wav", ambientGain: 0.42, videoPosition: "50% 58%" },
+  { id: "rain", label: { zh: "雨夜伴灯", en: "Rainlight Night" }, detail: { zh: "雨幕与暖灯", en: "Rainfall & lamplight" }, icon: "☂", image: "/scenes/rain-night-video-poster.jpg", video: "/video-scenes/rain-night.mp4", ambience: "/audio/ambience/rain-night-v2.wav", ambientGain: 1, videoPosition: "50% 58%" },
   { id: "stars", label: { zh: "暮光之城", en: "City at Dusk" }, detail: { zh: "落日与灯火", en: "Sunset & city lights" }, icon: "✦", image: "/scenes/twilight-city-video-poster.jpg", video: "/video-scenes/twilight-city.mp4", ambience: "/audio/ambience/twilight-city.wav", ambientGain: 1, videoPosition: "50% 58%" },
 ];
 

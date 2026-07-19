@@ -5,6 +5,26 @@ import test from "node:test";
 
 const require = createRequire(import.meta.url);
 
+function pcm16Rms(wav) {
+  let offset = 12;
+  while (offset + 8 <= wav.byteLength) {
+    const chunk = wav.subarray(offset, offset + 4).toString("ascii");
+    const size = wav.readUInt32LE(offset + 4);
+    if (chunk === "data") {
+      let sum = 0;
+      let samples = 0;
+      for (let cursor = offset + 8; cursor + 1 < offset + 8 + size; cursor += 2) {
+        const value = wav.readInt16LE(cursor) / 32768;
+        sum += value * value;
+        samples += 1;
+      }
+      return Math.sqrt(sum / samples);
+    }
+    offset += 8 + size + (size % 2);
+  }
+  throw new Error("WAV data chunk missing");
+}
+
 async function render() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
@@ -118,13 +138,16 @@ test("dynamic scenes use optimized muted ping-pong videos and independent seamle
     assert.ok(video.byteLength > 3_000_000 && video.byteLength < 5_000_000);
     assert.equal(video.includes(Buffer.from("mp4a")), false);
   }
-  for (const file of ["coast.wav", "mountain-lake.wav", "rain-night.wav", "twilight-city.wav"]) {
+  const ambienceRms = new Map();
+  for (const file of ["coast.wav", "mountain-lake.wav", "rain-night-v2.wav", "twilight-city.wav"]) {
     assert.match(source, new RegExp(`/audio/ambience/${file.replace(".", "\\.")}`));
     const ambience = await readFile(new URL(`../public/audio/ambience/${file}`, import.meta.url));
     assert.ok(ambience.byteLength > 700_000);
     assert.equal(ambience.subarray(0, 4).toString("ascii"), "RIFF");
     assert.equal(ambience.subarray(8, 12).toString("ascii"), "WAVE");
+    ambienceRms.set(file, pcm16Rms(ambience));
   }
+  assert.ok(ambienceRms.get("rain-night-v2.wav") < ambienceRms.get("coast.wav"));
   assert.match(source, /autoPlay[\s\S]*loop[\s\S]*muted[\s\S]*preload="auto"/);
   assert.doesNotMatch(source, /requestVideoFrameCallback/);
   assert.doesNotMatch(source, /VIDEO_CROSSFADE_SECONDS/);
@@ -132,7 +155,7 @@ test("dynamic scenes use optimized muted ping-pong videos and independent seamle
   assert.match(source, /source\.loop = true/);
   assert.match(source, /AMBIENT_CROSSFADE_SECONDS = 0\.8/);
   assert.match(source, /const AMBIENT_VOLUME = 0\.28/);
-  assert.match(source, /id: "rain"[\s\S]*ambientGain: 0\.42/);
+  assert.match(source, /id: "rain"[\s\S]*rain-night-v2\.wav[\s\S]*ambientGain: 1/);
   assert.match(source, /AMBIENT_VOLUME \* option\.ambientGain/);
   assert.match(source, /data-testid="ambient-toggle"/);
   assert.match(source, /ambientPreferenceRef\.current === "auto"/);
