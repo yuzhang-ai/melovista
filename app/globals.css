@@ -33,18 +33,25 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
 
 .scene-background {
   position: absolute;
-  z-index: -3;
-  inset: -2%;
+  z-index: -4;
+  inset: 0;
   background-position: center center;
   background-size: cover;
-  transform: scale(1.025);
-  animation: scene-reveal 520ms ease both, scene-breathe 22s ease-in-out infinite alternate;
+  animation: scene-reveal 420ms ease both;
 }
 
-.app-shell[data-scene="coast"] .scene-background { background-image: url("/scenes/coast-afternoon-v1.webp"); }
-.app-shell[data-scene="forest"] .scene-background { background-image: url("/scenes/forest-window-v1.webp"); }
-.app-shell[data-scene="rain"] .scene-background { background-image: url("/scenes/rainy-apartment-v1.webp"); }
-.app-shell[data-scene="stars"] .scene-background { background-image: url("/scenes/starlit-terrace-v1.webp"); }
+.scene-video {
+  position: absolute;
+  z-index: -3;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 520ms ease;
+}
+.scene-video.ready { opacity: 1; }
 
 .app-shell[data-scene="forest"] {
   --gold: #e9ef78;
@@ -61,11 +68,11 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
   --spark-glow: 82, 188, 255;
 }
 .app-shell[data-scene="stars"] {
-  --gold: #c9a9ff;
-  --spark-center: #fcf8ff;
-  --spark-mid: #d7bcff;
-  --spark-edge: #8d65ed;
-  --spark-glow: 156, 112, 246;
+  --gold: #ffc27a;
+  --spark-center: #fff9ef;
+  --spark-mid: #ffc982;
+  --spark-edge: #ef784b;
+  --spark-glow: 255, 145, 78;
 }
 
 .scene-light {
@@ -91,18 +98,13 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
 }
 .app-shell[data-scene="stars"] .scene-light {
   background:
-    linear-gradient(180deg, rgba(4, 8, 21, 0.22) 0%, transparent 38%, rgba(4, 8, 18, 0.08) 62%, rgba(3, 5, 11, 0.82) 100%),
-    radial-gradient(circle at 9% 66%, rgba(255, 177, 70, 0.08), transparent 24%);
+    linear-gradient(180deg, rgba(55, 20, 17, 0.16) 0%, transparent 38%, rgba(30, 12, 12, 0.08) 62%, rgba(13, 7, 7, 0.8) 100%),
+    radial-gradient(circle at 50% 35%, rgba(255, 189, 112, 0.12), transparent 30%);
 }
 
 @keyframes scene-reveal {
   from { opacity: 0.35; }
   to { opacity: 1; }
-}
-
-@keyframes scene-breathe {
-  from { transform: scale(1.025) translate3d(-0.2%, 0, 0); }
-  to { transform: scale(1.045) translate3d(0.25%, -0.35%, 0); }
 }
 
 .floating-header {
@@ -444,12 +446,12 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
   .performance-pill { right: 16px; bottom: 240px; min-width: 300px; }
   .performance-pill > div { min-width: 68px; }
   .performance-pill .current-note { display: none; }
-  .scene-background { background-position: 54% center; }
   .immersive-notice { top: 145px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .scene-background, .note-spark, .playing .level-bars b { animation: none; }
+  .scene-video { display: none; }
   .note-spark { opacity: 0; }
   .piano-key, .brand-lockup, .audio-status { transition: none; }
 }

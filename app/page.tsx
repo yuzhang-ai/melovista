@@ -52,6 +52,8 @@ type SceneOption = {
   detail: string;
   icon: string;
   image: string;
+  video: string;
+  videoPosition: string;
 };
 
 type KeyboardLockNavigator = Navigator & {
@@ -190,10 +192,10 @@ const TIMBRE_OPTIONS: TimbreOption[] = [
 ];
 
 const SCENE_OPTIONS: SceneOption[] = [
-  { id: "coast", label: "海岸午后", detail: "海风与暖阳", icon: "☀", image: "/scenes/coast-afternoon-v1.webp" },
-  { id: "forest", label: "林间晴窗", detail: "溪流与叶影", icon: "☘", image: "/scenes/forest-window-v1.webp" },
-  { id: "rain", label: "雨夜公寓", detail: "雨声与暖灯", icon: "☂", image: "/scenes/rainy-apartment-v1.webp" },
-  { id: "stars", label: "星空露台", detail: "湖光与银河", icon: "✦", image: "/scenes/starlit-terrace-v1.webp" },
+  { id: "coast", label: "沧海听风", detail: "海风与暖阳", icon: "☀", image: "/scenes/coast-video-poster.jpg", video: "/video-scenes/coast.mp4", videoPosition: "50% 58%" },
+  { id: "forest", label: "山湖静语", detail: "湖面与雪峰", icon: "☘", image: "/scenes/mountain-lake-video-poster.jpg", video: "/video-scenes/mountain-lake.mp4", videoPosition: "50% 62%" },
+  { id: "rain", label: "雨夜伴灯", detail: "雨幕与暖灯", icon: "☂", image: "/scenes/rain-night-video-poster.jpg", video: "/video-scenes/rain-night.mp4", videoPosition: "50% 58%" },
+  { id: "stars", label: "暮光之城", detail: "落日与灯火", icon: "✦", image: "/scenes/twilight-city-video-poster.jpg", video: "/video-scenes/twilight-city.mp4", videoPosition: "50% 58%" },
 ];
 
 const TIMBRE_BY_ID = new Map(TIMBRE_OPTIONS.map((option) => [option.id, option]));
@@ -320,6 +322,8 @@ export default function Home() {
   const [articulation, setArticulation] = useState<Articulation>("short");
   const [timbre, setTimbre] = useState<Timbre>("acoustic");
   const [scene, setScene] = useState<SceneId>("coast");
+  const [videoEnabled, setVideoEnabled] = useState(false);
+  const [readyVideoScene, setReadyVideoScene] = useState<SceneId | null>(null);
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const [immersiveMode, setImmersiveMode] = useState(false);
   const [showPerformance, setShowPerformance] = useState(false);
@@ -620,6 +624,14 @@ export default function Home() {
   }, [enterImmersiveMode, exitImmersiveMode]);
 
   useEffect(() => {
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updateVideoPreference = () => setVideoEnabled(!reducedMotion.matches);
+    updateVideoPreference();
+    reducedMotion.addEventListener("change", updateVideoPreference);
+    return () => reducedMotion.removeEventListener("change", updateVideoPreference);
+  }, []);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (immersiveModeRef.current) {
         event.preventDefault();
@@ -745,7 +757,25 @@ export default function Home() {
 
   return (
     <main className={`app-shell sunroom ${immersiveMode ? "immersive" : ""} ${activeCodes.size ? "playing" : ""}`} data-scene={scene}>
-      <div className="scene-background" key={scene} aria-hidden="true" />
+      <div className="scene-background" key={`poster-${scene}`} style={{ backgroundImage: `url(${selectedScene.image})` }} aria-hidden="true" />
+      {videoEnabled && (
+        <video
+          className={`scene-video ${readyVideoScene === scene ? "ready" : ""}`}
+          key={scene}
+          src={selectedScene.video}
+          poster={selectedScene.image}
+          style={{ objectPosition: selectedScene.videoPosition }}
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="metadata"
+          disablePictureInPicture
+          tabIndex={-1}
+          onCanPlay={() => setReadyVideoScene(scene)}
+          aria-hidden="true"
+        />
+      )}
       <div className="scene-light" aria-hidden="true" />
 
       <header className="floating-header">

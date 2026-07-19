@@ -14,11 +14,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "四景 · 六音区沉浸式钢琴",
-  description: "在海岸、森林、雨夜与星空四个沉浸场景中，用电脑键盘演奏覆盖 C1 到 B6 的真实采样音色。",
+  description: "在沧海、山湖、雨夜与暮光四个动态沉浸场景中，用电脑键盘演奏覆盖 C1 到 B6 的真实采样音色。",
   openGraph: {
     title: "四景 · 六音区沉浸式钢琴",
-    description: "海岸、森林、雨夜与星空，覆盖 C1 到 B6 的沉浸式虚拟琴房。",
-    images: ["/scenes/coast-afternoon-v1.webp"],
+    description: "沧海、山湖、雨夜与暮光，覆盖 C1 到 B6 的动态沉浸式虚拟琴房。",
+    images: ["/scenes/coast-video-poster.jpg"],
   },
 };
 
