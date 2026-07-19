@@ -30,11 +30,21 @@ test("server-renders the immersive three-octave piano", async () => {
   assert.match(html, /钢丝弦吉他/);
   assert.match(html, /小提琴/);
   assert.match(html, /萨克斯/);
+  assert.match(html, /进入沉浸模式/);
+  assert.match(html, /屏蔽非琴键误触/);
   assert.match(html, /LEFT ALT/);
   assert.match(html, /短音模式/);
   assert.match(html, /Salamander Grand Piano V3/);
   assert.match(html, /tonejs-instruments/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
+});
+
+test("immersive mode suppresses non-piano keyboard events", async () => {
+  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(source, /if \(immersiveModeRef\.current\)/);
+  assert.match(source, /event\.stopImmediatePropagation\(\)/);
+  assert.match(source, /if \(!KEY_BY_CODE\.has\(event\.code\)\) return/);
+  assert.match(source, /navigator as KeyboardLockNavigator/);
 });
 
 test("short and long articulation use natural release envelopes", async () => {

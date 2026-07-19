@@ -44,6 +44,17 @@ type TimbreOption = {
   gain: number;
 };
 
+type KeyboardLockNavigator = Navigator & {
+  keyboard?: {
+    lock?: (keyCodes?: string[]) => Promise<void>;
+    unlock?: () => void;
+  };
+};
+
+type ImmersiveFullscreenOptions = FullscreenOptions & {
+  keyboardLock?: "browser";
+};
+
 const MID_KEYS: KeyDefinition[] = [
   { code: "Backquote", label: "·", semitone: 0, group: "mid" },
   { code: "Digit1", label: "1", semitone: 2, group: "mid" },
@@ -251,6 +262,8 @@ export default function Home() {
   const lowOctaveRef = useRef<2 | 3>(3);
   const articulationRef = useRef<Articulation>("short");
   const timbreRef = useRef<Timbre>("acoustic");
+  const immersiveModeRef = useRef(false);
+  const fullscreenEnteredRef = useRef(false);
   const measurementsRef = useRef<number[]>([]);
 
   const [isAudioReady, setIsAudioReady] = useState(false);
@@ -260,6 +273,7 @@ export default function Home() {
   const [lowOctave, setLowOctave] = useState<2 | 3>(3);
   const [articulation, setArticulation] = useState<Articulation>("short");
   const [timbre, setTimbre] = useState<Timbre>("acoustic");
+  const [immersiveMode, setImmersiveMode] = useState(false);
   const [activeCodes, setActiveCodes] = useState<Set<string>>(new Set());
   const [lastNote, setLastNote] = useState("等待加载原声音源");
   const [lastScheduleMs, setLastScheduleMs] = useState(0);
@@ -477,18 +491,63 @@ export default function Home() {
     setLastNote(running ? `已切换到${option.label}音色` : `${option.label}已加载，点击右上角恢复音频`);
   }, [audioStatus, ensureSampleBank, releaseAll]);
 
+  const exitImmersiveMode = useCallback(async () => {
+    immersiveModeRef.current = false;
+    fullscreenEnteredRef.current = false;
+    setImmersiveMode(false);
+    releaseAll(0.06);
+    (navigator as KeyboardLockNavigator).keyboard?.unlock?.();
+    if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined);
+    setLastNote("已退出沉浸模式，快捷控制恢复");
+  }, [releaseAll]);
+
+  const enterImmersiveMode = useCallback(async () => {
+    releaseAll(0.06);
+    immersiveModeRef.current = true;
+    setImmersiveMode(true);
+    setLastNote("沉浸模式已开启：仅 36 个琴键映射响应");
+
+    try {
+      await document.documentElement.requestFullscreen({
+        navigationUI: "hide",
+        keyboardLock: "browser",
+      } as ImmersiveFullscreenOptions);
+      fullscreenEnteredRef.current = Boolean(document.fullscreenElement);
+    } catch {
+      fullscreenEnteredRef.current = false;
+    }
+
+    if (fullscreenEnteredRef.current) {
+      await (navigator as KeyboardLockNavigator).keyboard?.lock?.().catch(() => undefined);
+    }
+  }, [releaseAll]);
+
+  const toggleImmersiveMode = useCallback(() => {
+    if (immersiveModeRef.current) {
+      void exitImmersiveMode();
+    } else {
+      void enterImmersiveMode();
+    }
+  }, [enterImmersiveMode, exitImmersiveMode]);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.matches("input, textarea, select, [contenteditable='true']")) return;
+      if (immersiveModeRef.current) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (!KEY_BY_CODE.has(event.code)) return;
+      }
 
-      if (event.code === "AltLeft") {
+      const target = event.target as HTMLElement | null;
+      if (!immersiveModeRef.current && target?.matches("input, textarea, select, [contenteditable='true']")) return;
+
+      if (!immersiveModeRef.current && event.code === "AltLeft") {
         event.preventDefault();
         if (!event.repeat) toggleArticulation();
         return;
       }
 
-      if (event.code === "Space") {
+      if (!immersiveModeRef.current && event.code === "Space") {
         event.preventDefault();
         if (event.repeat) return;
         LOW_KEYS.forEach((key) => {
@@ -516,7 +575,13 @@ export default function Home() {
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
-      if (event.code === "Space" || event.code === "AltLeft") {
+      if (immersiveModeRef.current) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (!KEY_BY_CODE.has(event.code)) return;
+      }
+
+      if (!immersiveModeRef.current && (event.code === "Space" || event.code === "AltLeft")) {
         event.preventDefault();
         return;
       }
@@ -531,17 +596,30 @@ export default function Home() {
       if (document.hidden) releaseAll(0.08);
     };
     const onBlur = () => releaseAll(0.08);
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement && fullscreenEnteredRef.current && immersiveModeRef.current) {
+        fullscreenEnteredRef.current = false;
+        immersiveModeRef.current = false;
+        setImmersiveMode(false);
+        (navigator as KeyboardLockNavigator).keyboard?.unlock?.();
+        releaseAll(0.06);
+        setLastNote("全屏已退出，沉浸模式同步关闭");
+      }
+    };
 
     window.addEventListener("keydown", onKeyDown, { capture: true });
     window.addEventListener("keyup", onKeyUp, { capture: true });
     window.addEventListener("blur", onBlur);
     document.addEventListener("visibilitychange", onVisibilityChange);
+    document.addEventListener("fullscreenchange", onFullscreenChange);
 
     return () => {
       window.removeEventListener("keydown", onKeyDown, { capture: true });
       window.removeEventListener("keyup", onKeyUp, { capture: true });
       window.removeEventListener("blur", onBlur);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      (navigator as KeyboardLockNavigator).keyboard?.unlock?.();
       releaseAll(0.05);
     };
   }, [releaseAll, releaseVoice, startVoice, toggleArticulation]);
@@ -561,7 +639,7 @@ export default function Home() {
             : `加载并启动${selectedTimbre.label}`;
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${immersiveMode ? "immersive" : ""}`}>
       <header className="hero">
         <div>
           <div className="brand-line"><span className="status-dot" /> SAMPLE ENGINE · AQUA VISUAL</div>
@@ -624,8 +702,26 @@ export default function Home() {
             <span className="eyebrow">演奏区</span>
             <h2>按键亮起，气泡随音高上浮</h2>
           </div>
-          <span className="live-pill"><i /> LIVE</span>
+          <div className="instrument-actions">
+            <span className="live-pill"><i /> LIVE</span>
+            <button
+              className={`immersive-toggle ${immersiveMode ? "active" : ""}`}
+              type="button"
+              aria-pressed={immersiveMode}
+              onClick={toggleImmersiveMode}
+              data-testid="immersive-toggle"
+            >
+              <span>{immersiveMode ? "退出沉浸模式" : "进入沉浸模式"}</span>
+              <small>{immersiveMode ? "仅琴键响应" : "屏蔽非琴键误触"}</small>
+            </button>
+          </div>
         </div>
+        {immersiveMode && (
+          <div className="immersive-notice" role="status">
+            <strong>沉浸模式已开启</strong>
+            <span>仅 36 个琴键映射可以发声，Space、左 Alt 与其他按键均已停用；请点击上方按钮退出。</span>
+          </div>
+        )}
         <div className="instrument-scroll">
           <div className="instrument-stage">
             <div className="water-rays" aria-hidden="true" />
