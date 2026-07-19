@@ -92,7 +92,8 @@ const LOW_KEYS: KeyDefinition[] = [
 const ALL_KEYS = [...LOW_KEYS, ...MID_KEYS, ...HIGH_KEYS];
 const KEY_BY_CODE = new Map(ALL_KEYS.map((key) => [key.code, key]));
 const NOTE_NAMES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
-const SHORT_RELEASE_SECONDS = 0.12;
+const SHORT_RELEASE_TIME_CONSTANT_SECONDS = 0.72;
+const SHORT_RELEASE_STOP_SECONDS = 3;
 const LONG_RELEASE_TIME_CONSTANT_SECONDS = 1.8;
 const LONG_RELEASE_STOP_SECONDS = 9;
 
@@ -270,17 +271,19 @@ export default function Home() {
     const voice = voicesRef.current.get(code);
     if (!context || !voice) return;
 
-    const isNaturalLongRelease = forcedRelease === undefined && articulationRef.current === "long";
-    const releaseSeconds = forcedRelease ?? SHORT_RELEASE_SECONDS;
+    const isPlayedNoteRelease = forcedRelease === undefined;
+    const isLongRelease = articulationRef.current === "long";
     const now = context.currentTime;
     voice.gain.gain.cancelScheduledValues(now);
     voice.gain.gain.setValueAtTime(Math.max(voice.gain.gain.value, 0.0001), now);
-    if (isNaturalLongRelease) {
-      voice.gain.gain.setTargetAtTime(0.0001, now, LONG_RELEASE_TIME_CONSTANT_SECONDS);
-      voice.source.stop(now + LONG_RELEASE_STOP_SECONDS);
+    if (isPlayedNoteRelease) {
+      const timeConstant = isLongRelease ? LONG_RELEASE_TIME_CONSTANT_SECONDS : SHORT_RELEASE_TIME_CONSTANT_SECONDS;
+      const stopAfter = isLongRelease ? LONG_RELEASE_STOP_SECONDS : SHORT_RELEASE_STOP_SECONDS;
+      voice.gain.gain.setTargetAtTime(0.0001, now, timeConstant);
+      voice.source.stop(now + stopAfter);
     } else {
-      voice.gain.gain.exponentialRampToValueAtTime(0.0001, now + releaseSeconds);
-      voice.source.stop(now + releaseSeconds + 0.05);
+      voice.gain.gain.exponentialRampToValueAtTime(0.0001, now + forcedRelease);
+      voice.source.stop(now + forcedRelease + 0.05);
     }
     voicesRef.current.delete(code);
   }, []);
@@ -652,7 +655,7 @@ export default function Home() {
             <strong data-testid="articulation-mode">{articulation === "long" ? "长音模式" : "短音模式"}</strong>
           </div>
           <kbd>LEFT ALT</kbd>
-          <p>{articulation === "long" ? "松键后缓慢衰减，尾音可自然延续约 6—9 秒" : "松键后快速收音，适合颗粒感节奏"}</p>
+          <p>{articulation === "long" ? "松键后缓慢衰减，尾音可自然延续约 6—9 秒" : "松键后保留约 2—3 秒尾音，清晰但不生硬"}</p>
         </button>
       </footer>
 

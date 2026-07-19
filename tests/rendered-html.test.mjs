@@ -37,9 +37,11 @@ test("server-renders the immersive three-octave piano", async () => {
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
 
-test("long articulation uses a slow natural release envelope", async () => {
+test("short and long articulation use natural release envelopes", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(source, /SHORT_RELEASE_TIME_CONSTANT_SECONDS = 0\.72/);
+  assert.match(source, /SHORT_RELEASE_STOP_SECONDS = 3/);
   assert.match(source, /LONG_RELEASE_TIME_CONSTANT_SECONDS = 1\.8/);
   assert.match(source, /LONG_RELEASE_STOP_SECONDS = 9/);
-  assert.match(source, /setTargetAtTime\(0\.0001, now, LONG_RELEASE_TIME_CONSTANT_SECONDS\)/);
+  assert.match(source, /setTargetAtTime\(0\.0001, now, timeConstant\)/);
 });
