@@ -48,10 +48,11 @@ test("server-renders the immersive six-range piano", async () => {
   assert.match(html, /性能信息/);
   assert.match(html, /钢琴曲库/);
   assert.match(html, /圣诞快乐，劳伦斯先生/);
+  assert.match(html, /蒲公英的约定/);
   assert.match(html, /致爱丽丝/);
   assert.match(html, /导入本地 MIDI/);
   assert.match(html, /不会上传服务器/);
-  assert.doesNotMatch(html, /蒲公英的约定|你离开的事实|Call of Silence/);
+  assert.doesNotMatch(html, /你离开的事实|Call of Silence/);
   assert.match(html, /LEFT ALT/);
   assert.match(html, /data-testid="articulation-mode">短音/);
   assert.match(html, /Salamander Grand Piano V3/);
@@ -59,22 +60,28 @@ test("server-renders the immersive six-range piano", async () => {
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
 
-test("appreciation mode schedules two built-in pieces while preserving generic local-only imports", async () => {
+test("appreciation mode schedules three built-in pieces while preserving generic local-only imports", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const furEliseBuffer = await readFile(new URL("../public/midi/fur-elise.mid", import.meta.url));
   const mrLawrenceBuffer = await readFile(new URL("../public/midi/merry-christmas-mr-lawrence.mid", import.meta.url));
+  const dandelionsBuffer = await readFile(new URL("../public/midi/dandelions-promise.mid", import.meta.url));
   const { Midi } = require("@tonejs/midi");
   const furElise = new Midi(furEliseBuffer);
   const mrLawrence = new Midi(mrLawrenceBuffer);
+  const dandelions = new Midi(dandelionsBuffer);
   const furEliseNotes = furElise.tracks.flatMap((track) => track.notes);
   const mrLawrenceNotes = mrLawrence.tracks.flatMap((track) => track.notes);
+  const dandelionsNotes = dandelions.tracks.flatMap((track) => track.notes);
 
   assert.ok(furEliseNotes.length > 800);
   assert.ok(furElise.duration > 120);
   assert.ok(mrLawrenceNotes.length > 1300);
   assert.ok(mrLawrence.duration > 300);
+  assert.ok(dandelionsNotes.length > 800);
+  assert.ok(dandelions.duration > 240);
   assert.match(source, /midiUrl: "\/midi\/fur-elise\.mid"/);
   assert.match(source, /midiUrl: "\/midi\/merry-christmas-mr-lawrence\.mid"/);
+  assert.match(source, /midiUrl: "\/midi\/dandelions-promise\.mid"/);
   assert.match(source, /setInterval\(tick, 25\)/);
   assert.match(source, /const songHorizon = position \+ 0\.16 \* playback\.speed/);
   assert.match(source, /source\.start\(startAt\)/);
@@ -86,7 +93,7 @@ test("appreciation mode schedules two built-in pieces while preserving generic l
   assert.match(importHandler, /parsedSongsRef\.current\.set\("local-import", parsed\)/);
   assert.match(source, /autoMidiCountsRef\.current\.set/);
   assert.match(source, /data-testid="library-toggle"/);
-  assert.match(source, /\[0\.75, 1, 1\.25\]/);
+  assert.match(source, /\[0\.75, 1, 1\.25, 1\.5, 2\]/);
 });
 
 test("MeloVista provides persistent Chinese and English interfaces", async () => {
@@ -108,7 +115,11 @@ test("dynamic scenes use muted looping video with poster and reduced-motion fall
   for (const file of ["coast.mp4", "mountain-lake.mp4", "rain-night.mp4", "twilight-city.mp4"]) {
     assert.match(source, new RegExp(`/video-scenes/${file.replace(".", "\\.")}`));
   }
-  assert.match(source, /autoPlay\s+loop\s+muted\s+playsInline\s+preload="metadata"/);
+  assert.match(source, /muted=\{!ambientEnabled\}/);
+  assert.match(source, /const AMBIENT_VOLUME = 0\.28/);
+  assert.match(source, /data-testid="ambient-toggle"/);
+  assert.match(source, /ambientPreferenceRef\.current === "auto"/);
+  assert.match(source, /void applyAmbientAudio\(true\)/);
   assert.match(source, /matchMedia\("\(prefers-reduced-motion: reduce\)"\)/);
   assert.match(source, /readyVideoScene === scene/);
   assert.match(styles, /\.scene-video \{[\s\S]*object-fit: cover/);

@@ -14,7 +14,7 @@ type Articulation = "short" | "long";
 type Timbre = "acoustic" | "bright" | "violin" | "guitar" | "saxophone";
 type SceneId = "coast" | "forest" | "rain" | "stars";
 type Locale = "zh" | "en";
-type SongId = "merry-christmas-mr-lawrence" | "fur-elise" | "local-import";
+type SongId = "merry-christmas-mr-lawrence" | "dandelions-promise" | "fur-elise" | "local-import";
 type OpenMenu = "scene" | "timbre" | null;
 type SampleBankKey = Exclude<Timbre, "bright">;
 type AudioStatus = "idle" | "starting" | "loading" | "running" | "suspended" | "error";
@@ -160,6 +160,7 @@ const SHORT_RELEASE_TIME_CONSTANT_SECONDS = 0.72;
 const SHORT_RELEASE_STOP_SECONDS = 3;
 const LONG_RELEASE_TIME_CONSTANT_SECONDS = 1.8;
 const LONG_RELEASE_STOP_SECONDS = 9;
+const AMBIENT_VOLUME = 0.28;
 
 const UI_COPY = {
   zh: {
@@ -178,6 +179,10 @@ const UI_COPY = {
     noteLength: "延音",
     short: "短音",
     long: "长音",
+    ambient: "环境声",
+    ambientOn: "轻声开启",
+    ambientOff: "已关闭",
+    toggleAmbient: "切换背景环境声",
     mode: "模式",
     enterImmersive: "沉浸演奏",
     exitImmersive: "退出沉浸",
@@ -253,6 +258,10 @@ const UI_COPY = {
     noteLength: "Length",
     short: "Short",
     long: "Long",
+    ambient: "Ambience",
+    ambientOn: "Softly on",
+    ambientOff: "Muted",
+    toggleAmbient: "Toggle background ambience",
     mode: "Mode",
     enterImmersive: "Immersive",
     exitImmersive: "Exit immersive",
@@ -383,6 +392,13 @@ const LIBRARY_SONGS: LibrarySong[] = [
     composer: { zh: "坂本龙一", en: "Ryuichi Sakamoto" },
     color: "#d7b78a",
     midiUrl: "/midi/merry-christmas-mr-lawrence.mid",
+  },
+  {
+    id: "dandelions-promise",
+    title: { zh: "蒲公英的约定", en: "Dandelion's Promise" },
+    composer: { zh: "周杰伦", en: "Jay Chou" },
+    color: "#d9e59a",
+    midiUrl: "/midi/dandelions-promise.mid",
   },
   {
     id: "fur-elise",
@@ -558,6 +574,9 @@ export default function Home() {
   const particleLayerRef = useRef<HTMLDivElement | null>(null);
   const controlDockRef = useRef<HTMLElement | null>(null);
   const midiInputRef = useRef<HTMLInputElement | null>(null);
+  const sceneVideoRef = useRef<HTMLVideoElement | null>(null);
+  const ambientEnabledRef = useRef(false);
+  const ambientPreferenceRef = useRef<"auto" | "on" | "off">("auto");
   const lowOctaveRef = useRef<2 | 3>(2);
   const extremeOctaveRef = useRef<1 | 6>(1);
   const articulationRef = useRef<Articulation>("short");
@@ -579,6 +598,7 @@ export default function Home() {
   const [locale, setLocale] = useState<Locale>("zh");
   const [videoEnabled, setVideoEnabled] = useState(false);
   const [readyVideoScene, setReadyVideoScene] = useState<SceneId | null>(null);
+  const [ambientEnabled, setAmbientEnabled] = useState(false);
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const [immersiveMode, setImmersiveMode] = useState(false);
   const [showPerformance, setShowPerformance] = useState(false);
@@ -749,7 +769,32 @@ export default function Home() {
     return buffers;
   }, []);
 
+  const applyAmbientAudio = useCallback(async (enabled: boolean, userInitiated = false) => {
+    if (userInitiated) ambientPreferenceRef.current = enabled ? "on" : "off";
+    ambientEnabledRef.current = enabled;
+    setAmbientEnabled(enabled);
+
+    const video = sceneVideoRef.current;
+    if (!video) return;
+    video.volume = AMBIENT_VOLUME;
+    video.muted = !enabled;
+    if (!enabled) return;
+
+    try {
+      await video.play();
+    } catch {
+      ambientPreferenceRef.current = "off";
+      ambientEnabledRef.current = false;
+      video.muted = true;
+      setAmbientEnabled(false);
+    }
+  }, []);
+
   const initializeAudio = useCallback(async () => {
+    if (ambientPreferenceRef.current === "auto") {
+      ambientPreferenceRef.current = "on";
+      void applyAmbientAudio(true);
+    }
     setAudioStatus("starting");
     let context = audioContextRef.current;
     if (!context) {
@@ -806,7 +851,7 @@ export default function Home() {
     setLastNote(currentLocale === "zh"
       ? (running ? `${timbreLabel}音色已就绪，可以弹奏` : "音源已加载，请再次点击启动音频")
       : (running ? `${timbreLabel} is ready to play` : "Source loaded. Click again to start audio."));
-  }, [ensureSampleBank]);
+  }, [applyAmbientAudio, ensureSampleBank]);
 
   const clearAutoVisuals = useCallback(() => {
     autoVisualTimersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -1410,12 +1455,18 @@ export default function Home() {
           style={{ objectPosition: selectedScene.videoPosition }}
           autoPlay
           loop
-          muted
+          muted={!ambientEnabled}
           playsInline
           preload="metadata"
           disablePictureInPicture
           tabIndex={-1}
-          onCanPlay={() => setReadyVideoScene(scene)}
+          ref={sceneVideoRef}
+          onCanPlay={(event) => {
+            event.currentTarget.volume = AMBIENT_VOLUME;
+            event.currentTarget.muted = !ambientEnabledRef.current;
+            if (ambientEnabledRef.current) void event.currentTarget.play().catch(() => { void applyAmbientAudio(false, true); });
+            setReadyVideoScene(scene);
+          }}
           aria-hidden="true"
         />
       )}
@@ -1483,10 +1534,17 @@ export default function Home() {
           </button>
         </nav>
 
-        <button className={`audio-status ${isAudioReady ? "ready" : ""}`} onClick={initializeAudio} disabled={audioStatus === "loading"} data-testid="start-audio">
-          <i />
-          <span>{audioButtonText}<small>{audioStatus === "running" ? `${selectedTimbreLabel} · ${articulation === "long" ? copy.long : copy.short}` : copy.startEngine}</small></span>
-        </button>
+        <div className="audio-cluster">
+          <button className={`ambient-toggle ${ambientEnabled ? "active" : ""}`} type="button" aria-pressed={ambientEnabled} aria-label={copy.toggleAmbient} onClick={() => { void applyAmbientAudio(!ambientEnabled, true); }} data-testid="ambient-toggle">
+            <span aria-hidden="true">≋</span>
+            <small>{copy.ambient}</small>
+            <b>{ambientEnabled ? copy.ambientOn : copy.ambientOff}</b>
+          </button>
+          <button className={`audio-status ${isAudioReady ? "ready" : ""}`} onClick={initializeAudio} disabled={audioStatus === "loading"} data-testid="start-audio">
+            <i />
+            <span>{audioButtonText}<small>{audioStatus === "running" ? `${selectedTimbreLabel} · ${articulation === "long" ? copy.long : copy.short}` : copy.startEngine}</small></span>
+          </button>
+        </div>
       </header>
 
       <aside className={`library-drawer ${showLibrary ? "open" : ""}`} aria-hidden={!showLibrary}>
@@ -1547,7 +1605,7 @@ export default function Home() {
 
           <div className="speed-controls" aria-label={copy.speed}>
             <small>{copy.speed}</small>
-            {[0.75, 1, 1.25].map((speed) => (
+            {[0.75, 1, 1.25, 1.5, 2].map((speed) => (
               <button className={playbackSpeed === speed ? "active" : ""} type="button" key={speed} onClick={() => changePlaybackSpeed(speed)}>{speed}×</button>
             ))}
           </div>
