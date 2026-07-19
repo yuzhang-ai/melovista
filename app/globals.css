@@ -359,10 +359,18 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
 .speed-controls small { margin-right: 3px; color: rgba(255, 255, 255, 0.42); font-size: 8px; }
 .speed-controls button { padding: 4px 7px; color: rgba(255, 255, 255, 0.55); font: 650 8px/1 var(--font-geist-mono), monospace; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 999px; background: transparent; cursor: pointer; }
 .speed-controls button.active { color: #241b11; border-color: transparent; background: var(--song-color); }
-.midi-import { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 11px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
-.midi-import button { padding: 7px 11px; color: white; font-size: 9px; border: 1px solid color-mix(in srgb, var(--song-color), transparent 38%); border-radius: 999px; background: color-mix(in srgb, var(--song-color), transparent 82%); cursor: pointer; }
-.midi-import small { color: rgba(255, 255, 255, 0.38); font-size: 7px; }
+.midi-import { position: relative; display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding: 10px; border: 1px dashed rgba(152, 216, 193, 0.34); border-radius: 14px; background: rgba(115, 190, 164, 0.07); transition: border-color 160ms ease, background 160ms ease; }
+.midi-import.active { border-style: solid; border-color: rgba(152, 216, 193, 0.62); background: rgba(115, 190, 164, 0.12); }
+.midi-import > small { color: rgba(255, 255, 255, 0.4); font-size: 7px; line-height: 1.4; }
 .midi-import input { display: none; }
+.midi-import-main { display: flex; align-items: center; gap: 9px; width: 100%; padding: 0; color: white; text-align: left; border: 0; background: transparent; cursor: pointer; }
+.midi-import-main > i { display: grid; flex: 0 0 28px; place-items: center; width: 28px; height: 28px; color: #193b30; font-style: normal; font-size: 17px; border-radius: 9px; background: #98d8c1; box-shadow: 0 0 18px rgba(152, 216, 193, 0.2); }
+.midi-import-main > span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.midi-import-main strong { font-size: 10px; }
+.midi-import-main small { color: rgba(255, 255, 255, 0.5); font-size: 8px; }
+.imported-midi { display: flex; min-width: 0; flex-direction: column; gap: 2px; padding: 7px 8px; color: #d9fff0; text-align: left; border: 1px solid rgba(152, 216, 193, 0.2); border-radius: 9px; background: rgba(152, 216, 193, 0.08); cursor: pointer; }
+.imported-midi span { color: rgba(217, 255, 240, 0.58); font-size: 7px; }
+.imported-midi strong { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .song-license { position: relative; display: block; margin-top: 9px; color: rgba(255, 255, 255, 0.46); font-size: 7px; text-align: center; text-underline-offset: 2px; }
 
 .instrument-panel { position: absolute; z-index: 6; inset: 0; pointer-events: none; }

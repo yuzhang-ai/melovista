@@ -48,10 +48,10 @@ test("server-renders the immersive six-range piano", async () => {
   assert.match(html, /性能信息/);
   assert.match(html, /钢琴曲库/);
   assert.match(html, /圣诞快乐，劳伦斯先生/);
-  assert.match(html, /蒲公英的约定/);
   assert.match(html, /致爱丽丝/);
-  assert.match(html, /你离开的事实/);
-  assert.match(html, /Call of Silence/);
+  assert.match(html, /导入本地 MIDI/);
+  assert.match(html, /不会上传服务器/);
+  assert.doesNotMatch(html, /蒲公英的约定|你离开的事实|Call of Silence/);
   assert.match(html, /LEFT ALT/);
   assert.match(html, /data-testid="articulation-mode">短音/);
   assert.match(html, /Salamander Grand Piano V3/);
@@ -59,16 +59,22 @@ test("server-renders the immersive six-range piano", async () => {
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
 
-test("appreciation mode schedules public-domain MIDI while preserving local-only imports", async () => {
+test("appreciation mode schedules two built-in pieces while preserving generic local-only imports", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
-  const midiBuffer = await readFile(new URL("../public/midi/fur-elise.mid", import.meta.url));
+  const furEliseBuffer = await readFile(new URL("../public/midi/fur-elise.mid", import.meta.url));
+  const mrLawrenceBuffer = await readFile(new URL("../public/midi/merry-christmas-mr-lawrence.mid", import.meta.url));
   const { Midi } = require("@tonejs/midi");
-  const midi = new Midi(midiBuffer);
-  const notes = midi.tracks.flatMap((track) => track.notes);
+  const furElise = new Midi(furEliseBuffer);
+  const mrLawrence = new Midi(mrLawrenceBuffer);
+  const furEliseNotes = furElise.tracks.flatMap((track) => track.notes);
+  const mrLawrenceNotes = mrLawrence.tracks.flatMap((track) => track.notes);
 
-  assert.ok(notes.length > 800);
-  assert.ok(midi.duration > 120);
+  assert.ok(furEliseNotes.length > 800);
+  assert.ok(furElise.duration > 120);
+  assert.ok(mrLawrenceNotes.length > 1300);
+  assert.ok(mrLawrence.duration > 300);
   assert.match(source, /midiUrl: "\/midi\/fur-elise\.mid"/);
+  assert.match(source, /midiUrl: "\/midi\/merry-christmas-mr-lawrence\.mid"/);
   assert.match(source, /setInterval\(tick, 25\)/);
   assert.match(source, /const songHorizon = position \+ 0\.16 \* playback\.speed/);
   assert.match(source, /source\.start\(startAt\)/);
@@ -76,6 +82,8 @@ test("appreciation mode schedules public-domain MIDI while preserving local-only
   assert.match(source, /file\.arrayBuffer\(\)/);
   const importHandler = source.slice(source.indexOf("const importLibraryMidi"), source.indexOf("const selectTimbre"));
   assert.doesNotMatch(importHandler, /fetch\(|FormData|XMLHttpRequest/);
+  assert.match(importHandler, /localMidiTitle\(file\.name\)/);
+  assert.match(importHandler, /parsedSongsRef\.current\.set\("local-import", parsed\)/);
   assert.match(source, /autoMidiCountsRef\.current\.set/);
   assert.match(source, /data-testid="library-toggle"/);
   assert.match(source, /\[0\.75, 1, 1\.25\]/);

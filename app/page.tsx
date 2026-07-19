@@ -14,7 +14,7 @@ type Articulation = "short" | "long";
 type Timbre = "acoustic" | "bright" | "violin" | "guitar" | "saxophone";
 type SceneId = "coast" | "forest" | "rain" | "stars";
 type Locale = "zh" | "en";
-type SongId = "merry-christmas-mr-lawrence" | "dandelions-promise" | "fur-elise" | "truth-that-you-leave" | "call-of-silence";
+type SongId = "merry-christmas-mr-lawrence" | "fur-elise" | "local-import";
 type OpenMenu = "scene" | "timbre" | null;
 type SampleBankKey = Exclude<Timbre, "bright">;
 type AudioStatus = "idle" | "starting" | "loading" | "running" | "suspended" | "error";
@@ -186,12 +186,13 @@ const UI_COPY = {
     library: "曲库",
     appreciation: "欣赏模式",
     songLibrary: "钢琴曲库",
-    libraryIntro: "自动演奏时仍可继续使用键盘跟弹",
+    libraryIntro: "选择内置曲目，或导入任意本地 MIDI 跟弹",
     available: "可直接播放",
-    needsMidi: "需导入授权 MIDI",
-    imported: "本地 MIDI 已就绪",
-    importMidi: "导入已授权 MIDI",
-    localOnly: "文件仅在当前浏览器解析，不会上传",
+    imported: "当前本地曲目",
+    importMidi: "导入本地 MIDI",
+    importHint: "选择 .mid 或 .midi 文件",
+    localOnly: "仅在当前浏览器读取和播放，不会上传服务器",
+    localComposer: "本地导入",
     publicDomain: "公版曲目 · Mutopia Project",
     play: "播放",
     pause: "暂停",
@@ -201,8 +202,7 @@ const UI_COPY = {
     speed: "速度",
     openPerformance: "性能信息",
     closeLibrary: "关闭曲库",
-    midiRequired: "请先导入你拥有使用权的 MIDI 文件",
-    midiLoaded: "本地 MIDI 已导入，可以播放",
+    midiLoaded: "本地 MIDI 已就绪，可以播放",
     midiInvalid: "无法解析这个 MIDI 文件，请换一个文件重试",
     songLoading: "正在准备曲目…",
     songPlaying: "正在欣赏",
@@ -261,12 +261,13 @@ const UI_COPY = {
     library: "Library",
     appreciation: "Listen",
     songLibrary: "Piano Library",
-    libraryIntro: "Keep playing along on your keyboard while the song performs",
+    libraryIntro: "Choose a built-in piece or import any local MIDI to play along",
     available: "Ready to play",
-    needsMidi: "Licensed MIDI required",
-    imported: "Local MIDI ready",
-    importMidi: "Import licensed MIDI",
-    localOnly: "The file is parsed only in this browser and is never uploaded",
+    imported: "Current local piece",
+    importMidi: "Import local MIDI",
+    importHint: "Choose a .mid or .midi file",
+    localOnly: "Read and played only in this browser; never uploaded",
+    localComposer: "Local import",
     publicDomain: "Public domain · Mutopia Project",
     play: "Play",
     pause: "Pause",
@@ -276,8 +277,7 @@ const UI_COPY = {
     speed: "Speed",
     openPerformance: "Performance info",
     closeLibrary: "Close library",
-    midiRequired: "Import a MIDI file you have permission to use first",
-    midiLoaded: "Local MIDI imported and ready to play",
+    midiLoaded: "Local MIDI is ready to play",
     midiInvalid: "This MIDI file could not be parsed. Try another file.",
     songLoading: "Preparing the song…",
     songPlaying: "Now playing",
@@ -382,12 +382,7 @@ const LIBRARY_SONGS: LibrarySong[] = [
     title: { zh: "圣诞快乐，劳伦斯先生", en: "Merry Christmas, Mr. Lawrence" },
     composer: { zh: "坂本龙一", en: "Ryuichi Sakamoto" },
     color: "#d7b78a",
-  },
-  {
-    id: "dandelions-promise",
-    title: { zh: "蒲公英的约定", en: "Dandelion's Promise" },
-    composer: { zh: "周杰伦", en: "Jay Chou" },
-    color: "#d9e59a",
+    midiUrl: "/midi/merry-christmas-mr-lawrence.mid",
   },
   {
     id: "fur-elise",
@@ -398,23 +393,18 @@ const LIBRARY_SONGS: LibrarySong[] = [
     sourceUrl: "https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=931",
     license: "Public Domain",
   },
-  {
-    id: "truth-that-you-leave",
-    title: { zh: "你离开的事实", en: "The Truth That You Leave" },
-    composer: { zh: "Pianoboy", en: "Pianoboy" },
-    color: "#9fbfd9",
-  },
-  {
-    id: "call-of-silence",
-    title: { zh: "Call of Silence", en: "Call of Silence" },
-    composer: { zh: "泽野弘之", en: "Hiroyuki Sawano" },
-    color: "#a6a1d8",
-  },
 ];
+
+const LOCAL_IMPORT_SONG: LibrarySong = {
+  id: "local-import",
+  title: { zh: "本地 MIDI", en: "Local MIDI" },
+  composer: { zh: "本地导入", en: "Local import" },
+  color: "#98d8c1",
+};
 
 const TIMBRE_BY_ID = new Map(TIMBRE_OPTIONS.map((option) => [option.id, option]));
 const SCENE_BY_ID = new Map(SCENE_OPTIONS.map((option) => [option.id, option]));
-const SONG_BY_ID = new Map(LIBRARY_SONGS.map((song) => [song.id, song]));
+const SONG_BY_ID = new Map([...LIBRARY_SONGS, LOCAL_IMPORT_SONG].map((song) => [song.id, song]));
 const WHITE_KEY_INDEX = new Map([[0, 0], [2, 1], [4, 2], [5, 3], [7, 4], [9, 5], [11, 6]]);
 const BLACK_KEY_BOUNDARY = new Map([[1, 1], [3, 2], [6, 4], [8, 5], [10, 6]]);
 
@@ -471,6 +461,14 @@ function formatPlaybackTime(seconds: number) {
   const safeSeconds = Math.max(0, Math.floor(seconds));
   const minutes = Math.floor(safeSeconds / 60);
   return `${minutes}:${String(safeSeconds % 60).padStart(2, "0")}`;
+}
+
+function localMidiTitle(fileName: string) {
+  return fileName.replace(/\.(mid|midi)$/i, "").trim() || "Local MIDI";
+}
+
+function librarySongTitle(song: LibrarySong, locale: Locale, importedTitle: string) {
+  return song.id === "local-import" && importedTitle ? importedTitle : song.title[locale];
 }
 
 function nearestSample(midi: number, buffers: Map<number, AudioBuffer>, definitions: SampleDefinition[]) {
@@ -553,6 +551,7 @@ export default function Home() {
   const autoVisualTimersRef = useRef<number[]>([]);
   const autoSchedulerRef = useRef<number | null>(null);
   const parsedSongsRef = useRef(new Map<SongId, ParsedSong>());
+  const importedSongTitleRef = useRef("");
   const playbackRef = useRef({ notes: [] as SongNote[], nextIndex: 0, offset: 0, startedAt: 0, duration: 0, speed: 1 });
   const loopSongRef = useRef(false);
   const activeCodesRef = useRef(new Set<string>());
@@ -591,7 +590,7 @@ export default function Home() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [loopSong, setLoopSong] = useState(false);
   const [autoMidis, setAutoMidis] = useState<Set<number>>(new Set());
-  const [importedSongIds, setImportedSongIds] = useState<Set<SongId>>(new Set());
+  const [importedSongTitle, setImportedSongTitle] = useState("");
   const [activeCodes, setActiveCodes] = useState<Set<string>>(new Set());
   const [lastNote, setLastNote] = useState(UI_COPY.zh.waitingSource);
   const [lastScheduleMs, setLastScheduleMs] = useState(0);
@@ -921,10 +920,11 @@ export default function Home() {
   const beginLibraryPlayback = useCallback(async (offset?: number, speedOverride?: number) => {
     const song = SONG_BY_ID.get(selectedSongId) ?? LIBRARY_SONGS[0];
     const copy = UI_COPY[localeRef.current];
+    const title = librarySongTitle(song, localeRef.current, importedSongTitleRef.current);
     const chosenSpeed = speedOverride ?? playbackSpeed;
     const chosenOffset = Math.max(0, offset ?? playbackRef.current.offset);
     setPlaybackState("loading");
-    setLastNote(`${copy.songLoading} · ${song.title[localeRef.current]}`);
+    setLastNote(`${copy.songLoading} · ${title}`);
 
     let parsed: ParsedSong | null;
     try {
@@ -936,7 +936,7 @@ export default function Home() {
     }
     if (!parsed) {
       setPlaybackState("idle");
-      setLastNote(copy.midiRequired);
+      setLastNote(copy.midiInvalid);
       return;
     }
 
@@ -963,7 +963,7 @@ export default function Home() {
     setTrackDuration(parsed.duration);
     setPlaybackSeconds(safeOffset);
     setPlaybackState("playing");
-    setLastNote(`${copy.songPlaying} · ${song.title[localeRef.current]}`);
+    setLastNote(`${copy.songPlaying} · ${title}`);
 
     const tick = () => {
       const liveContext = audioContextRef.current;
@@ -992,7 +992,7 @@ export default function Home() {
           playback.offset = 0;
           playback.startedAt = 0;
           setPlaybackState("idle");
-          setLastNote(`${copy.songFinished} · ${song.title[localeRef.current]}`);
+          setLastNote(`${copy.songFinished} · ${title}`);
         }
       }
     };
@@ -1009,7 +1009,8 @@ export default function Home() {
     setPlaybackSeconds(position);
     setPlaybackState("paused");
     const song = SONG_BY_ID.get(selectedSongId) ?? LIBRARY_SONGS[0];
-    setLastNote(`${UI_COPY[localeRef.current].songPaused} · ${song.title[localeRef.current]}`);
+    const title = librarySongTitle(song, localeRef.current, importedSongTitleRef.current);
+    setLastNote(`${UI_COPY[localeRef.current].songPaused} · ${title}`);
   }, [currentPlaybackPosition, selectedSongId, stopAutoScheduler, stopAutoSources]);
 
   const resetLibraryPlayback = useCallback(() => {
@@ -1031,7 +1032,9 @@ export default function Home() {
 
   const moveLibrarySong = useCallback((direction: -1 | 1) => {
     const currentIndex = LIBRARY_SONGS.findIndex((song) => song.id === selectedSongId);
-    const nextIndex = (currentIndex + direction + LIBRARY_SONGS.length) % LIBRARY_SONGS.length;
+    const nextIndex = currentIndex < 0
+      ? (direction < 0 ? LIBRARY_SONGS.length - 1 : 0)
+      : (currentIndex + direction + LIBRARY_SONGS.length) % LIBRARY_SONGS.length;
     chooseLibrarySong(LIBRARY_SONGS[nextIndex].id);
   }, [chooseLibrarySong, selectedSongId]);
 
@@ -1066,16 +1069,20 @@ export default function Home() {
     try {
       const parsed = await parseMidiBuffer(await file.arrayBuffer());
       if (!parsed.notes.length) throw new Error("Empty MIDI");
-      parsedSongsRef.current.set(selectedSongId, parsed);
-      setImportedSongIds((current) => new Set(current).add(selectedSongId));
+      const title = localMidiTitle(file.name);
+      resetLibraryPlayback();
+      parsedSongsRef.current.set("local-import", parsed);
+      importedSongTitleRef.current = title;
+      setImportedSongTitle(title);
+      setSelectedSongId("local-import");
       setTrackDuration(parsed.duration);
       setPlaybackSeconds(0);
       playbackRef.current.offset = 0;
-      setLastNote(copy.midiLoaded);
+      setLastNote(`${copy.midiLoaded} · ${title}`);
     } catch {
       setLastNote(copy.midiInvalid);
     }
-  }, [selectedSongId]);
+  }, [resetLibraryPlayback]);
 
   const selectTimbre = useCallback(async (next: Timbre) => {
     if (next === timbreRef.current || audioStatus === "loading") return;
@@ -1375,9 +1382,10 @@ export default function Home() {
   const selectedTimbre = TIMBRE_BY_ID.get(timbre) ?? TIMBRE_OPTIONS[0];
   const selectedScene = SCENE_BY_ID.get(scene) ?? SCENE_OPTIONS[0];
   const selectedSong = SONG_BY_ID.get(selectedSongId) ?? LIBRARY_SONGS[0];
+  const selectedSongTitle = librarySongTitle(selectedSong, locale, importedSongTitle);
   const selectedTimbreLabel = selectedTimbre.label[locale];
   const selectedSceneLabel = selectedScene.label[locale];
-  const selectedSongReady = Boolean(selectedSong.midiUrl || importedSongIds.has(selectedSong.id));
+  const selectedSongReady = Boolean(selectedSong.midiUrl || (selectedSong.id === "local-import" && importedSongTitle));
   const audioButtonText = audioStatus === "running"
     ? (locale === "zh" ? `${selectedTimbreLabel}已就绪` : `${selectedTimbreLabel} ready`)
     : audioStatus === "loading"
@@ -1492,22 +1500,35 @@ export default function Home() {
 
         <div className="song-list" role="listbox" aria-label={copy.songLibrary}>
           {LIBRARY_SONGS.map((song, index) => {
-            const ready = Boolean(song.midiUrl || importedSongIds.has(song.id));
             return (
               <button className={selectedSongId === song.id ? "selected" : ""} type="button" role="option" aria-selected={selectedSongId === song.id} key={song.id} onClick={() => chooseLibrarySong(song.id)}>
                 <i style={{ "--song-color": song.color } as React.CSSProperties}>{String(index + 1).padStart(2, "0")}</i>
                 <span><strong>{song.title[locale]}</strong><small>{song.composer[locale]}</small></span>
-                <b className={ready ? "ready" : "locked"}>{ready ? "●" : "○"}</b>
+                <b className="ready">●</b>
               </button>
             );
           })}
         </div>
 
+        <div className={`midi-import ${selectedSong.id === "local-import" ? "active" : ""}`}>
+          <button className="midi-import-main" type="button" onClick={() => midiInputRef.current?.click()}>
+            <i aria-hidden="true">＋</i>
+            <span><strong>{copy.importMidi}</strong><small>{copy.importHint}</small></span>
+          </button>
+          <small>{copy.localOnly}</small>
+          {importedSongTitle && (
+            <button className="imported-midi" type="button" onClick={() => chooseLibrarySong("local-import")}>
+              <span>{copy.imported}</span><strong>{importedSongTitle}</strong>
+            </button>
+          )}
+          <input ref={midiInputRef} type="file" accept=".mid,.midi,audio/midi,audio/x-midi" onChange={(event) => { void importLibraryMidi(event.target.files?.[0] ?? null); event.currentTarget.value = ""; }} />
+        </div>
+
         <div className="now-playing-card" style={{ "--song-color": selectedSong.color } as React.CSSProperties}>
           <div className="now-playing-copy">
-            <small>{playbackState === "playing" ? copy.songPlaying : selectedSongReady ? copy.available : copy.needsMidi}</small>
-            <strong>{selectedSong.title[locale]}</strong>
-            <span>{selectedSong.composer[locale]}</span>
+            <small>{playbackState === "playing" ? copy.songPlaying : copy.available}</small>
+            <strong>{selectedSongTitle}</strong>
+            <span>{selectedSong.id === "local-import" ? copy.localComposer : selectedSong.composer[locale]}</span>
           </div>
 
           <div className="song-progress">
@@ -1530,14 +1551,6 @@ export default function Home() {
               <button className={playbackSpeed === speed ? "active" : ""} type="button" key={speed} onClick={() => changePlaybackSpeed(speed)}>{speed}×</button>
             ))}
           </div>
-
-          {!selectedSong.midiUrl && (
-            <div className="midi-import">
-              <button type="button" onClick={() => midiInputRef.current?.click()}>{importedSongIds.has(selectedSong.id) ? copy.imported : copy.importMidi}</button>
-              <small>{copy.localOnly}</small>
-              <input ref={midiInputRef} type="file" accept=".mid,.midi,audio/midi,audio/x-midi" onChange={(event) => { void importLibraryMidi(event.target.files?.[0] ?? null); event.currentTarget.value = ""; }} />
-            </div>
-          )}
 
           {selectedSong.sourceUrl && (
             <a className="song-license" href={selectedSong.sourceUrl} target="_blank" rel="noreferrer">{copy.publicDomain} · {selectedSong.license}</a>

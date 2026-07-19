@@ -14,10 +14,10 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "乐境 MeloVista · 沉浸式六音区钢琴",
-  description: "乐境 MeloVista 提供中英文界面、五首钢琴曲库与可跟弹的欣赏模式，在四个动态场景中演奏覆盖 C1 到 B6 的真实采样音色。",
+  description: "乐境 MeloVista 提供中英文界面、两首内置钢琴曲与通用本地 MIDI 导入，在四个动态场景中自动演奏、自由跟弹。",
   openGraph: {
     title: "乐境 MeloVista · Immersive Piano",
-    description: "A bilingual immersive piano room with four living scenes, six visible octaves and a play-along MIDI library.",
+    description: "A bilingual immersive piano room with four living scenes, two built-in pieces and local MIDI play-along.",
     images: ["/scenes/coast-video-poster.jpg"],
   },
 };
