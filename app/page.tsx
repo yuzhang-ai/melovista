@@ -12,6 +12,8 @@ type KeyDefinition = {
 
 type Articulation = "short" | "long";
 type Timbre = "acoustic" | "bright" | "violin" | "guitar" | "saxophone";
+type SceneId = "coast" | "forest" | "rain" | "stars";
+type OpenMenu = "scene" | "timbre" | null;
 type SampleBankKey = Exclude<Timbre, "bright">;
 type AudioStatus = "idle" | "starting" | "loading" | "running" | "suspended" | "error";
 
@@ -42,6 +44,14 @@ type TimbreOption = {
   detail: string;
   bank: SampleBankKey;
   gain: number;
+};
+
+type SceneOption = {
+  id: SceneId;
+  label: string;
+  detail: string;
+  icon: string;
+  image: string;
 };
 
 type KeyboardLockNavigator = Navigator & {
@@ -160,7 +170,15 @@ const TIMBRE_OPTIONS: TimbreOption[] = [
   { id: "saxophone", label: "萨克斯", detail: "醇厚管乐", bank: "saxophone", gain: 0.54 },
 ];
 
+const SCENE_OPTIONS: SceneOption[] = [
+  { id: "coast", label: "海岸午后", detail: "海风与暖阳", icon: "☀", image: "/scenes/coast-afternoon-v1.webp" },
+  { id: "forest", label: "林间晴窗", detail: "溪流与叶影", icon: "☘", image: "/scenes/forest-window-v1.webp" },
+  { id: "rain", label: "雨夜公寓", detail: "雨声与暖灯", icon: "☂", image: "/scenes/rainy-apartment-v1.webp" },
+  { id: "stars", label: "星空露台", detail: "湖光与银河", icon: "✦", image: "/scenes/starlit-terrace-v1.webp" },
+];
+
 const TIMBRE_BY_ID = new Map(TIMBRE_OPTIONS.map((option) => [option.id, option]));
+const SCENE_BY_ID = new Map(SCENE_OPTIONS.map((option) => [option.id, option]));
 const WHITE_KEY_INDEX = new Map([[0, 0], [2, 1], [4, 2], [5, 3], [7, 4], [9, 5], [11, 6]]);
 const BLACK_KEY_BOUNDARY = new Map([[1, 1], [3, 2], [6, 4], [8, 5], [10, 6]]);
 
@@ -260,6 +278,7 @@ export default function Home() {
   const voicesRef = useRef(new Map<string, Voice>());
   const activeCodesRef = useRef(new Set<string>());
   const particleLayerRef = useRef<HTMLDivElement | null>(null);
+  const controlDockRef = useRef<HTMLElement | null>(null);
   const lowOctaveRef = useRef<2 | 3>(3);
   const articulationRef = useRef<Articulation>("short");
   const timbreRef = useRef<Timbre>("acoustic");
@@ -274,6 +293,8 @@ export default function Home() {
   const [lowOctave, setLowOctave] = useState<2 | 3>(3);
   const [articulation, setArticulation] = useState<Articulation>("short");
   const [timbre, setTimbre] = useState<Timbre>("acoustic");
+  const [scene, setScene] = useState<SceneId>("coast");
+  const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const [immersiveMode, setImmersiveMode] = useState(false);
   const [showPerformance, setShowPerformance] = useState(false);
   const [activeCodes, setActiveCodes] = useState<Set<string>>(new Set());
@@ -326,24 +347,24 @@ export default function Home() {
       ? (BLACK_KEY_BOUNDARY.get(key.semitone) ?? 0) / 7
       : ((WHITE_KEY_INDEX.get(key.semitone) ?? 0) + 0.5) / 7;
     const globalX = ((groupIndex + localX) / 3) * 100;
-    const isLow = key.group === "low";
-    const count = isLow ? 5 : key.group === "high" ? 8 : 7;
+    const count = 9;
+    const rise = Math.max(layer.clientHeight - 18, 280);
 
     Array.from({ length: count }).forEach((_, index) => {
       const spark = document.createElement("i");
-      const size = isLow ? 4 + Math.random() * 6 : 2 + Math.random() * 4;
+      const size = index === 0 ? 9 : 3.5 + Math.random() * 4.5;
       spark.className = `note-spark ${index === 0 ? "note-core" : ""}`;
-      spark.style.left = `calc(${globalX}% + ${(Math.random() - 0.5) * (isLow ? 28 : 18)}px)`;
+      spark.style.left = `calc(${globalX}% + ${(Math.random() - 0.5) * 28}px)`;
       spark.style.setProperty("--spark-size", `${size}px`);
-      spark.style.setProperty("--spark-drift", `${(Math.random() - 0.46) * (isLow ? 80 : 130)}px`);
-      spark.style.setProperty("--spark-rise", `${isLow ? 110 + Math.random() * 90 : 190 + Math.random() * 150}px`);
-      spark.style.setProperty("--spark-duration", `${isLow ? 2.2 + Math.random() : 1.6 + Math.random() * 1.1}s`);
-      spark.style.setProperty("--spark-delay", `${index * 24}ms`);
+      spark.style.setProperty("--spark-drift", `${(Math.random() - 0.5) * 100}px`);
+      spark.style.setProperty("--spark-rise", `${rise}px`);
+      spark.style.setProperty("--spark-duration", `${2.45 + Math.random() * 0.55}s`);
+      spark.style.setProperty("--spark-delay", `${index * 32}ms`);
       spark.addEventListener("animationend", () => spark.remove(), { once: true });
       layer.appendChild(spark);
     });
 
-    while (layer.childElementCount > 140) layer.firstElementChild?.remove();
+    while (layer.childElementCount > 180) layer.firstElementChild?.remove();
   }, []);
 
   const startVoice = useCallback((code: string, key: KeyDefinition, eventStartedAt: number) => {
@@ -494,6 +515,39 @@ export default function Home() {
     setLastNote(running ? `已切换到${option.label}音色` : `${option.label}已加载，点击右上角恢复音频`);
   }, [audioStatus, ensureSampleBank, releaseAll]);
 
+  const selectScene = useCallback((next: SceneId) => {
+    const option = SCENE_BY_ID.get(next) ?? SCENE_OPTIONS[0];
+    setScene(next);
+    setOpenMenu(null);
+    particleLayerRef.current?.replaceChildren();
+    setLastNote(`已进入${option.label} · ${option.detail}`);
+  }, []);
+
+  useEffect(() => {
+    const preloadTimer = window.setTimeout(() => {
+      SCENE_OPTIONS.slice(1).forEach((option) => {
+        const preload = new Image();
+        preload.src = option.image;
+      });
+    }, 800);
+    return () => window.clearTimeout(preloadTimer);
+  }, []);
+
+  useEffect(() => {
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!controlDockRef.current?.contains(event.target as Node)) setOpenMenu(null);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenMenu(null);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePress);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
+
   const exitImmersiveMode = useCallback(async () => {
     immersiveModeRef.current = false;
     fullscreenEnteredRef.current = false;
@@ -629,6 +683,7 @@ export default function Home() {
 
   const activeCodeSet = useMemo(() => activeCodes, [activeCodes]);
   const selectedTimbre = TIMBRE_BY_ID.get(timbre) ?? TIMBRE_OPTIONS[0];
+  const selectedScene = SCENE_BY_ID.get(scene) ?? SCENE_OPTIONS[0];
   const audioButtonText = audioStatus === "running"
     ? `${selectedTimbre.label}已就绪`
     : audioStatus === "loading"
@@ -642,8 +697,8 @@ export default function Home() {
             : `加载并启动${selectedTimbre.label}`;
 
   return (
-    <main className={`app-shell sunroom ${immersiveMode ? "immersive" : ""} ${activeCodes.size ? "playing" : ""}`}>
-      <div className="scene-background" aria-hidden="true" />
+    <main className={`app-shell sunroom ${immersiveMode ? "immersive" : ""} ${activeCodes.size ? "playing" : ""}`} data-scene={scene}>
+      <div className="scene-background" key={scene} aria-hidden="true" />
       <div className="scene-light" aria-hidden="true" />
 
       <header className="floating-header">
@@ -651,27 +706,45 @@ export default function Home() {
           <span className="brand-mark" aria-hidden="true">≋</span>
           <div>
             <h1>Three Octave Piano Lab</h1>
-            <p>海岸午后的沉浸式琴房</p>
+            <p>{selectedScene.label}的沉浸式琴房</p>
           </div>
         </div>
 
-        <nav className="control-dock" aria-label="演奏控制">
-          <div className="dock-item scene-item">
-            <span className="dock-icon" aria-hidden="true">☀</span>
-            <span><small>场景</small>海岸午后</span>
+        <nav className="control-dock" aria-label="演奏控制" ref={controlDockRef}>
+          <div className="dock-menu-wrap scene-selector">
+            <button className={`dock-button scene-item ${openMenu === "scene" ? "active" : ""}`} type="button" aria-haspopup="listbox" aria-expanded={openMenu === "scene"} onClick={() => setOpenMenu((current) => current === "scene" ? null : "scene")}>
+              <span className="dock-icon" aria-hidden="true">{selectedScene.icon}</span>
+              <span><small>场景</small><b>{selectedScene.label}</b></span>
+              <i className="dock-chevron" aria-hidden="true">⌄</i>
+            </button>
+            <div className={`glass-menu scene-menu ${openMenu === "scene" ? "open" : ""}`} role="listbox" aria-label="选择场景">
+              <div className="menu-heading"><small>SCENES</small><strong>选择一扇窗</strong></div>
+              {SCENE_OPTIONS.map((option) => (
+                <button className={scene === option.id ? "selected" : ""} type="button" role="option" aria-selected={scene === option.id} key={option.id} onClick={() => selectScene(option.id)}>
+                  <i className="scene-thumb" style={{ backgroundImage: `url(${option.image})` }} aria-hidden="true" />
+                  <span><strong>{option.label}</strong><small>{option.detail}</small></span>
+                  <b aria-hidden="true">{scene === option.id ? "✓" : ""}</b>
+                </button>
+              ))}
+            </div>
           </div>
-          <label className="dock-item timbre-select">
-            <span className="dock-icon" aria-hidden="true">♩</span>
-            <span><small>音色</small></span>
-            <select
-              value={timbre}
-              disabled={audioStatus === "loading"}
-              onChange={(event) => void selectTimbre(event.target.value as Timbre)}
-              aria-label="选择音色"
-            >
-              {TIMBRE_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-            </select>
-          </label>
+          <div className="dock-menu-wrap timbre-selector">
+            <button className={`dock-button timbre-button ${openMenu === "timbre" ? "active" : ""}`} type="button" disabled={audioStatus === "loading"} aria-haspopup="listbox" aria-expanded={openMenu === "timbre"} onClick={() => setOpenMenu((current) => current === "timbre" ? null : "timbre")}>
+              <span className="dock-icon" aria-hidden="true">♩</span>
+              <span><small>音色</small><b>{selectedTimbre.label}</b></span>
+              <i className="dock-chevron" aria-hidden="true">⌄</i>
+            </button>
+            <div className={`glass-menu timbre-menu ${openMenu === "timbre" ? "open" : ""}`} role="listbox" aria-label="选择音色">
+              <div className="menu-heading"><small>TIMBRE</small><strong>选择乐器音色</strong></div>
+              {TIMBRE_OPTIONS.map((option) => (
+                <button className={timbre === option.id ? "selected" : ""} type="button" role="option" aria-selected={timbre === option.id} key={option.id} onClick={() => { setOpenMenu(null); void selectTimbre(option.id); }}>
+                  <i className="timbre-orb" aria-hidden="true">{option.id === "acoustic" || option.id === "bright" ? "♩" : option.id === "violin" ? "𝄞" : option.id === "guitar" ? "♢" : "◖"}</i>
+                  <span><strong>{option.label}</strong><small>{option.detail}</small></span>
+                  <b aria-hidden="true">{timbre === option.id ? "✓" : ""}</b>
+                </button>
+              ))}
+            </div>
+          </div>
           <button className={`dock-button ${articulation === "long" ? "active" : ""}`} type="button" onClick={toggleArticulation} data-testid="articulation-toggle">
             <span className="dock-icon" aria-hidden="true">⌁</span>
             <span><small>延音</small><b data-testid="articulation-mode">{articulation === "long" ? "长音" : "短音"}</b></span>
@@ -718,7 +791,7 @@ export default function Home() {
         </div>
       </aside>
 
-      <section className="instrument-panel" aria-label="海岸午后三八度真实钢琴键盘与金色音符光尘">
+      <section className="instrument-panel" aria-label={`${selectedScene.label}三八度真实钢琴键盘与发光音符光尘`}>
         <div className="instrument-scroll">
           <div className="instrument-stage">
             <div className="particle-surface" ref={particleLayerRef} aria-hidden="true" />

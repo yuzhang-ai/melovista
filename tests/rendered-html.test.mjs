@@ -20,13 +20,18 @@ test("server-renders the immersive three-octave piano", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>海岸午后 · 三八度沉浸式钢琴<\/title>/i);
-  assert.match(html, /海岸午后的沉浸式琴房/);
+  assert.match(html, /<title>四景 · 三八度沉浸式钢琴<\/title>/i);
+  assert.match(html, /海岸午后/);
   assert.match(html, /加载并启动原声/);
   assert.match(html, /aria-label="高音区 C5 到 B5"/);
   assert.match(html, /aria-label="中音区 C4 到 B4"/);
   assert.match(html, /aria-label="可切换低音区 C3 到 B3"/);
-  assert.match(html, /aria-label="海岸午后三八度真实钢琴键盘与金色音符光尘"/);
+  assert.match(html, /aria-label="海岸午后三八度真实钢琴键盘与发光音符光尘"/);
+  assert.match(html, /林间晴窗/);
+  assert.match(html, /雨夜公寓/);
+  assert.match(html, /星空露台/);
+  assert.match(html, /aria-label="选择音色"/);
+  assert.doesNotMatch(html, /<select\b/i);
   assert.match(html, /钢丝弦吉他/);
   assert.match(html, /小提琴/);
   assert.match(html, /萨克斯/);
@@ -65,4 +70,11 @@ test("audio starts before the scene creates note particles", async () => {
   assert.notEqual(audioStart, -1);
   assert.notEqual(visualStart, -1);
   assert.ok(audioStart < visualStart);
+});
+
+test("all note particles share the scene's full rise height", async () => {
+  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(source, /const rise = Math\.max\(layer\.clientHeight - 18, 280\)/);
+  assert.match(source, /setProperty\("--spark-rise", `\$\{rise\}px`\)/);
+  assert.doesNotMatch(source, /key\.group.*--spark-rise|--spark-rise.*key\.group/);
 });

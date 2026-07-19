@@ -13,11 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "海岸午后 · 三八度沉浸式钢琴",
-  description: "在阳光海景琴房中使用电脑键盘演奏三八度真实采样音色。",
+  title: "四景 · 三八度沉浸式钢琴",
+  description: "在海岸、森林、雨夜与星空四个沉浸场景中，用电脑键盘演奏三八度真实采样音色。",
   openGraph: {
-    title: "海岸午后 · 三八度沉浸式钢琴",
-    description: "阳光、海风与真实采样钢琴，一间可以安静停留和演奏的虚拟琴房。",
+    title: "四景 · 三八度沉浸式钢琴",
+    description: "海岸、森林、雨夜与星空，四间可以安静停留和演奏的虚拟琴房。",
     images: ["/scenes/coast-afternoon-v1.webp"],
   },
 };
