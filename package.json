@@ -1,6 +1,6 @@
 {
   "name": "three-octave-keyboard-piano",
-  "version": "0.11.3",
+  "version": "0.12.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vinext dev",
     "build": "vinext build",
+    "build:vercel": "next build",
     "start": "vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",

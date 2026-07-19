@@ -12,7 +12,16 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const deploymentHost =
+  process.env.VERCEL_PROJECT_PRODUCTION_URL ??
+  process.env.VERCEL_URL ??
+  "melovista.vercel.app";
+const deploymentUrl = deploymentHost.startsWith("http")
+  ? deploymentHost
+  : `https://${deploymentHost}`;
+
 export const metadata: Metadata = {
+  metadataBase: new URL(deploymentUrl),
   title: "乐境 MeloVista · 沉浸式六音区钢琴",
   description: "乐境 MeloVista 提供中英文界面、三首内置钢琴曲、通用本地 MIDI 导入与无缝环境声，在四个动态场景中自动演奏、自由跟弹。",
   openGraph: {

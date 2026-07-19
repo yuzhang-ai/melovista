@@ -248,6 +248,7 @@ const UI_COPY = {
     extendedHint: "扩展音区",
     lowHint: "低音区",
     headphoneHint: "建议使用有线耳机获得最佳体验",
+    githubCredit: "在 GitHub 查看乐境开源项目",
     waitingSource: "等待加载原声音源",
     languageChanged: "已切换至中文界面",
   },
@@ -327,6 +328,7 @@ const UI_COPY = {
     extendedHint: "Extended range",
     lowHint: "Low register",
     headphoneHint: "Wired headphones are recommended for the best experience",
+    githubCredit: "View MeloVista on GitHub",
     waitingSource: "Load the current sound source to begin",
     languageChanged: "English interface enabled",
   },
@@ -623,7 +625,7 @@ export default function Home() {
   const [autoMidis, setAutoMidis] = useState<Set<number>>(new Set());
   const [importedSongTitle, setImportedSongTitle] = useState("");
   const [activeCodes, setActiveCodes] = useState<Set<string>>(new Set());
-  const [lastNote, setLastNote] = useState(UI_COPY.zh.waitingSource);
+  const [lastNote, setLastNote] = useState<string>(UI_COPY.zh.waitingSource);
   const [lastScheduleMs, setLastScheduleMs] = useState(0);
   const [p95ScheduleMs, setP95ScheduleMs] = useState(0);
   const [diagnostics, setDiagnostics] = useState<AudioDiagnostics | null>(null);
@@ -1760,7 +1762,10 @@ export default function Home() {
         <i />
         <span><kbd>LEFT ALT</kbd> {articulation === "long" ? copy.long : copy.short}</span>
         <i />
-        <span>{copy.headphoneHint}</span>
+        <span className="headphone-hint">{copy.headphoneHint}</span>
+        <a className="github-credit" href="https://github.com/yuzhang-ai/melovista" target="_blank" rel="noopener noreferrer" aria-label={copy.githubCredit} data-testid="github-credit">
+          <strong>GitHub</strong><span>yuzhang-ai / melovista</span><b aria-hidden="true">↗</b>
+        </a>
       </footer>
     </main>
   );

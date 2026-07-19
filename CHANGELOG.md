@@ -2,6 +2,24 @@
 
 本项目从 `v0.2.0` 起遵循语义化版本，并为每次公开版本保留 Git Tag。
 
+## [0.12.0] - 2026-07-19
+
+### Vercel 主站
+
+- 增加标准 Next.js 的 Vercel 构建通道，保留现有 Sites/Vinext 构建，项目可同时发布到两个平台。
+- Open Graph 等绝对资源地址优先使用 Vercel 生产域名，并为首次部署提供 `melovista.vercel.app` 默认地址。
+- 新增 `vercel.json`，固定 Next.js 框架识别和生产构建命令。
+
+### 开源署名
+
+- 页面底部加入轻量 GitHub 署名入口，跳转到 `yuzhang-ai/melovista`；中文、英文界面均提供对应无障碍说明。
+- 窄屏仅保留紧凑的 `GitHub ↗` 标记，避免遮挡琴键提示与沉浸画面。
+
+### 工程
+
+- 增加 Vercel 配置、双构建通道、生产域名和 GitHub 跳转的自动化验证。
+- 为 Next.js 构建排除仅由 Cloudflare Workers 使用的入口，避免平台专属类型影响 Vercel 发布。
+
 ## [0.11.3] - 2026-07-19
 
 ### 雨夜响度校准

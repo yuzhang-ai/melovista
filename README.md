@@ -6,6 +6,15 @@
 
 所有琴键产生的光尘都会抵达相同最高处，低音与高音只改变声音，不再改变粒子上升终点。场景与音色均使用自定义玻璃弹层，避免浏览器原生下拉框破坏沉浸感。
 
+## 在线体验
+
+- Vercel 主站：<https://melovista.vercel.app/>
+- 中文界面：<https://melovista.vercel.app/?lang=zh>
+- English：<https://melovista.vercel.app/?lang=en>
+- GitHub：<https://github.com/yuzhang-ai/melovista>
+
+原 `chatgpt.site` 地址作为历史版本兜底保留；分享时优先使用更简洁的 Vercel 主站地址。页面会记住用户选择的语言，通常不需要在链接中携带 `?lang=zh`。
+
 ## 欣赏模式与曲库
 
 顶部“曲库”打开欣赏模式。自动演奏通过 MIDI 音符事件复用现有 Web Audio 钢琴采样，支持播放/暂停、上一首/下一首、进度跳转、循环以及 `0.75× / 1× / 1.25× / 1.5× / 2×` 速度。自动音符使用柔和白金色琴键与光尘，用户键盘保持场景强调色，两者可以同时演奏。
@@ -77,6 +86,13 @@ npm.cmd run dev
 
 ```powershell
 npm.cmd test
+```
+
+Vercel 使用标准 Next.js 构建，原 Sites 部署继续使用 Vinext：
+
+```powershell
+npm.cmd run build:vercel
+npm.cmd run build
 ```
 
 发布前还需使用内置扬声器或有线耳机人工弹奏，确认真实端到端延迟、和弦并发与长短音尾音符合听感预期。

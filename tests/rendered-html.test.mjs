@@ -75,9 +75,27 @@ test("server-renders the immersive six-range piano", async () => {
   assert.doesNotMatch(html, /你离开的事实|Call of Silence/);
   assert.match(html, /LEFT ALT/);
   assert.match(html, /data-testid="articulation-mode">短音/);
+  assert.match(html, /data-testid="github-credit"/);
+  assert.match(html, /https:\/\/github\.com\/yuzhang-ai\/melovista/);
+  assert.match(html, /rel="noopener noreferrer"/);
   assert.match(html, /Salamander Grand Piano V3/);
   assert.match(html, /tonejs-instruments/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
+});
+
+test("Vercel deployment keeps the existing Sites build and uses the canonical public URL", async () => {
+  const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  const vercel = JSON.parse(await readFile(new URL("../vercel.json", import.meta.url), "utf8"));
+  const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+
+  assert.equal(packageJson.scripts.build, "vinext build");
+  assert.equal(packageJson.scripts["build:vercel"], "next build");
+  assert.equal(vercel.framework, "nextjs");
+  assert.equal(vercel.buildCommand, "npm run build:vercel");
+  assert.match(layout, /VERCEL_PROJECT_PRODUCTION_URL/);
+  assert.match(layout, /melovista\.vercel\.app/);
+  assert.match(styles, /\.github-credit \{/);
 });
 
 test("appreciation mode schedules three built-in pieces while preserving generic local-only imports", async () => {

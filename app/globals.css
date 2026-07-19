@@ -524,6 +524,24 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
 }
 .key-hints kbd { margin-right: 5px; color: #fff8dc; font: 700 8px/1 var(--font-geist-mono), monospace; }
 .key-hints i { width: 1px; height: 13px; background: rgba(255, 255, 255, 0.22); }
+.github-credit {
+  position: absolute;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  color: rgba(255, 255, 255, 0.68);
+  font: 600 8px/1 var(--font-geist-sans), sans-serif;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+.github-credit strong { color: rgba(255, 248, 220, 0.92); font-weight: 700; }
+.github-credit span { opacity: 0.72; }
+.github-credit b { font-size: 9px; }
+.github-credit:hover, .github-credit:focus-visible { color: #fff8dc; border-color: rgba(255, 248, 220, 0.42); background: rgba(255, 255, 255, 0.08); outline: none; }
 
 .immersive.playing .brand-lockup, .immersive.playing .audio-cluster { opacity: 0.12; }
 
@@ -535,6 +553,9 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
   .audio-status { min-width: 170px; }
   .dock-item, .dock-button { min-width: 88px; padding-right: 10px; padding-left: 10px; }
   .dock-item, .dock-button { min-width: 92px; }
+  .key-hints { justify-content: flex-start; gap: 10px; padding-right: 92px; padding-left: 14px; }
+  .key-hints .headphone-hint { display: none; }
+  .github-credit span { display: none; }
 }
 
 @media (max-width: 720px) {
