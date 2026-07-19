@@ -23,10 +23,13 @@ test("server-renders the immersive six-range piano", async () => {
   assert.match(html, /<title>四景 · 六音区沉浸式钢琴<\/title>/i);
   assert.match(html, /海岸午后/);
   assert.match(html, /加载并启动原声/);
-  assert.match(html, /aria-label="高音区 C5 到 B5"/);
-  assert.match(html, /aria-label="中音区 C4 到 B4"/);
-  assert.match(html, /aria-label="可切换低音区 C2 到 B2"/);
-  assert.match(html, /aria-label="可切换扩展音区 C1 到 B1"/);
+  assert.match(html, /aria-label="扩展音区 C1 到 B1，当前可演奏"/);
+  assert.match(html, /aria-label="低音区 C2 到 B2，当前可演奏"/);
+  assert.match(html, /aria-label="低音区 C3 到 B3，待切换"/);
+  assert.match(html, /aria-label="中音区 C4 到 B4，当前可演奏"/);
+  assert.match(html, /aria-label="高音区 C5 到 B5，当前可演奏"/);
+  assert.match(html, /aria-label="扩展音区 C6 到 B6，待切换"/);
+  assert.equal(html.match(/class="piano-octave /g)?.length, 6);
   assert.match(html, /aria-label="海岸午后可切换六音区真实钢琴键盘与发光音符光尘"/);
   assert.match(html, /NUM \+/);
   assert.match(html, /林间晴窗/);
@@ -65,14 +68,19 @@ test("navigation and numpad keys map the switchable C1 and C6 range", async () =
   assert.match(source, /extremeOctaveRef\.current === 1 \? 6 : 1/);
   assert.match(source, /midi: 24, file: "C1\.mp3"/);
   assert.match(source, /midi: 84, file: "C6\.mp3"/);
-  assert.match(styles, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/);
   assert.match(styles, /height: 186px/);
 });
 
-test("the default visual keyboard exposes a continuous C1 through B2 range", async () => {
+test("the visual keyboard exposes all six octaves while keeping switchable groups exclusive", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.match(source, /lowOctaveRef = useRef<2 \| 3>\(2\)/);
   assert.match(source, /\[lowOctave, setLowOctave\] = useState<2 \| 3>\(2\)/);
+  assert.match(source, /enabled=\{lowOctave === 2\}/);
+  assert.match(source, /enabled=\{lowOctave === 3\}/);
+  assert.match(source, /enabled=\{extremeOctave === 1\}/);
+  assert.match(source, /enabled=\{extremeOctave === 6\}/);
+  assert.match(source, /const globalX = \(\(groupIndex \+ localX\) \/ 6\) \* 100/);
 });
 
 test("short and long articulation use natural release envelopes", async () => {

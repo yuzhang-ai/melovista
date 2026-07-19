@@ -251,20 +251,25 @@ function PianoOctave({
   octave,
   keys,
   activeCodes,
+  enabled = true,
 }: {
   title: string;
   octave: number;
   keys: KeyDefinition[];
   activeCodes: Set<string>;
+  enabled?: boolean;
 }) {
   const naturals = keys.filter((key) => !key.accidental);
   const accidentals = keys.filter((key) => key.accidental);
 
   return (
-    <section className="piano-octave" aria-label={`${title} C${octave} 到 B${octave}`}>
+    <section
+      className={`piano-octave ${enabled ? "enabled" : "inactive"}`}
+      aria-label={`${title} C${octave} 到 B${octave}，${enabled ? "当前可演奏" : "待切换"}`}
+    >
       <div className="white-keys">
         {naturals.map((key) => (
-          <div className={`piano-key white ${activeCodes.has(key.code) ? "active" : ""}`} key={key.code} data-key-code={key.code}>
+          <div className={`piano-key white ${enabled && activeCodes.has(key.code) ? "active" : ""}`} key={key.code} data-key-code={key.code}>
             <div className="piano-key-label">
               <kbd>{key.label}</kbd>
               <span>{NOTE_NAMES[key.semitone]}{octave}</span>
@@ -274,7 +279,7 @@ function PianoOctave({
       </div>
       {accidentals.map((key) => (
         <div
-          className={`piano-key black ${activeCodes.has(key.code) ? "active" : ""}`}
+          className={`piano-key black ${enabled && activeCodes.has(key.code) ? "active" : ""}`}
           key={key.code}
           data-key-code={key.code}
           style={{ left: blackKeyLeft(key.semitone) }}
@@ -285,7 +290,7 @@ function PianoOctave({
           </div>
         </div>
       ))}
-      <div className="octave-caption">{title} · C{octave}—B{octave}</div>
+      <div className="octave-caption">C{octave}—B{octave} · {enabled ? "当前" : "待切换"}</div>
     </section>
   );
 }
@@ -363,18 +368,17 @@ export default function Home() {
     const layer = particleLayerRef.current;
     if (!layer) return;
 
-    const extremeIsLow = extremeOctaveRef.current === 1;
     const groupIndex = key.group === "extreme"
-      ? (extremeIsLow ? 0 : 3)
+      ? (extremeOctaveRef.current === 1 ? 0 : 5)
       : key.group === "low"
-        ? (extremeIsLow ? 1 : 0)
+        ? (lowOctaveRef.current === 2 ? 1 : 2)
         : key.group === "mid"
-          ? (extremeIsLow ? 2 : 1)
-          : (extremeIsLow ? 3 : 2);
+          ? 3
+          : 4;
     const localX = key.accidental
       ? (BLACK_KEY_BOUNDARY.get(key.semitone) ?? 0) / 7
       : ((WHITE_KEY_INDEX.get(key.semitone) ?? 0) + 0.5) / 7;
-    const globalX = ((groupIndex + localX) / 4) * 100;
+    const globalX = ((groupIndex + localX) / 6) * 100;
     const count = 9;
     const rise = Math.max(layer.clientHeight - 18, 280);
 
@@ -845,11 +849,12 @@ export default function Home() {
               <i className="level-bars" aria-hidden="true"><b /><b /><b /><b /></i>
             </div>
             <div className="piano-shell">
-              {extremeOctave === 1 && <PianoOctave title="可切换扩展音区" octave={extremeOctave} keys={EXTREME_KEYS} activeCodes={activeCodeSet} />}
-              <PianoOctave title="可切换低音区" octave={lowOctave} keys={LOW_KEYS} activeCodes={activeCodeSet} />
+              <PianoOctave title="扩展音区" octave={1} keys={EXTREME_KEYS} activeCodes={activeCodeSet} enabled={extremeOctave === 1} />
+              <PianoOctave title="低音区" octave={2} keys={LOW_KEYS} activeCodes={activeCodeSet} enabled={lowOctave === 2} />
+              <PianoOctave title="低音区" octave={3} keys={LOW_KEYS} activeCodes={activeCodeSet} enabled={lowOctave === 3} />
               <PianoOctave title="中音区" octave={4} keys={MID_KEYS} activeCodes={activeCodeSet} />
               <PianoOctave title="高音区" octave={5} keys={HIGH_KEYS} activeCodes={activeCodeSet} />
-              {extremeOctave === 6 && <PianoOctave title="可切换扩展音区" octave={extremeOctave} keys={EXTREME_KEYS} activeCodes={activeCodeSet} />}
+              <PianoOctave title="扩展音区" octave={6} keys={EXTREME_KEYS} activeCodes={activeCodeSet} enabled={extremeOctave === 6} />
             </div>
           </div>
         </div>

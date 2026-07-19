@@ -288,7 +288,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
 .instrument-panel { position: absolute; z-index: 6; inset: 0; pointer-events: none; }
 .instrument-scroll { width: 100%; height: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; pointer-events: auto; }
 .instrument-scroll::-webkit-scrollbar { display: none; }
-.instrument-stage { position: relative; min-width: 1060px; height: 100svh; min-height: 690px; overflow: hidden; }
+.instrument-stage { position: relative; min-width: 1260px; height: 100svh; min-height: 690px; overflow: hidden; }
 .particle-surface { position: absolute; z-index: 8; top: 110px; right: 0; bottom: 210px; left: 0; overflow: visible; pointer-events: none; }
 
 .note-spark {
@@ -355,7 +355,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
   bottom: 40px;
   left: 16px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   height: 186px;
   padding: 9px 8px 6px;
   border: 1px solid rgba(255, 245, 215, 0.18);
@@ -400,6 +400,8 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
 .piano-key.active .piano-key-label { opacity: 1; }
 .piano-key.active .piano-key-label kbd { color: #533506; background: #fff1bd; }
 .piano-key.active .piano-key-label span { color: #8b5c0d; }
+.piano-octave.inactive .piano-key-label { opacity: 0.24; }
+.piano-octave.inactive .octave-caption { opacity: 0.62; }
 .octave-caption { position: absolute; right: 0; bottom: 2px; left: 0; color: rgba(255, 243, 216, 0.36); font: 620 6px/1 var(--font-geist-mono), monospace; letter-spacing: 0.06em; text-align: center; text-transform: uppercase; }
 
 .key-hints {
