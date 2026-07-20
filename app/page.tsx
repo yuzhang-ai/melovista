@@ -14,7 +14,9 @@ type Articulation = "short" | "long";
 type Timbre = "acoustic" | "bright" | "violin" | "guitar" | "saxophone";
 type SceneId = "coast" | "forest" | "rain" | "stars";
 type Locale = "zh" | "en";
-type SongId = "merry-christmas-mr-lawrence" | "dandelions-promise" | "flower-sea" | "fur-elise" | "local-import";
+type BuiltInSongId = "merry-christmas-mr-lawrence" | "dandelions-promise" | "flower-sea" | "fur-elise";
+type LocalSongId = `local:${string}`;
+type SongId = BuiltInSongId | LocalSongId;
 type OpenMenu = "scene" | "timbre" | null;
 type SampleBankKey = Exclude<Timbre, "bright">;
 type AudioStatus = "idle" | "starting" | "loading" | "running" | "suspended" | "error";
@@ -52,6 +54,8 @@ type SongNote = {
 type ParsedSong = {
   notes: SongNote[];
   duration: number;
+  bpm: number | null;
+  trackCount: number;
 };
 
 type LibrarySong = {
@@ -62,6 +66,23 @@ type LibrarySong = {
   midiUrl?: string;
   sourceUrl?: string;
   license?: string;
+  localPath?: string;
+  bpm?: number | null;
+  duration?: number;
+  noteCount?: number;
+};
+
+type LocalLibrarySong = LibrarySong & {
+  id: LocalSongId;
+  localPath: string;
+  bpm: number | null;
+  duration: number;
+  noteCount: number;
+};
+
+type ImportProgress = {
+  current: number;
+  total: number;
 };
 
 type TimbreOption = {
@@ -201,12 +222,22 @@ const UI_COPY = {
     library: "曲库",
     appreciation: "欣赏模式",
     songLibrary: "钢琴曲库",
-    libraryIntro: "选择内置曲目，或导入任意本地 MIDI 跟弹",
+    libraryIntro: "选择内置曲目，或整批载入本地 MIDI 音乐库",
     available: "可直接播放",
-    imported: "当前本地曲目",
-    importMidi: "导入本地 MIDI",
-    importHint: "选择 .mid 或 .midi 文件",
-    localOnly: "仅在当前浏览器读取和播放，不会上传服务器",
+    imported: "本地音乐库",
+    importMidi: "选择 MIDI 文件",
+    importFolder: "打开 MIDI 文件夹",
+    importHint: "支持多选，也可以拖入 .mid / .midi 文件",
+    localOnly: "只在当前浏览器会话读取和播放，不上传服务器",
+    localLibrary: "本地音乐库",
+    localLibraryEmpty: "还没有载入本地曲目",
+    localSearch: "搜索曲名或文件夹",
+    clearLocalLibrary: "清空本地曲库",
+    importWorking: "正在整理本地曲库",
+    importComplete: "本地曲库已更新",
+    importSkipped: "个文件无法解析，已跳过",
+    importNoMidi: "没有找到可读取的 .mid 或 .midi 文件",
+    localSessionHint: "刷新页面后需要重新选择文件夹",
     localComposer: "本地导入",
     publicDomain: "公版曲目 · Mutopia Project",
     play: "播放",
@@ -284,12 +315,22 @@ const UI_COPY = {
     library: "Library",
     appreciation: "Listen",
     songLibrary: "Piano Library",
-    libraryIntro: "Choose a built-in piece or import any local MIDI to play along",
+    libraryIntro: "Choose a built-in piece or load a local MIDI library in one go",
     available: "Ready to play",
-    imported: "Current local piece",
-    importMidi: "Import local MIDI",
-    importHint: "Choose a .mid or .midi file",
-    localOnly: "Read and played only in this browser; never uploaded",
+    imported: "Local library",
+    importMidi: "Choose MIDI files",
+    importFolder: "Open MIDI folder",
+    importHint: "Multi-select or drop .mid / .midi files here",
+    localOnly: "Read only in this browser session; never uploaded",
+    localLibrary: "Local library",
+    localLibraryEmpty: "No local pieces loaded yet",
+    localSearch: "Search title or folder",
+    clearLocalLibrary: "Clear local library",
+    importWorking: "Organizing local library",
+    importComplete: "Local library updated",
+    importSkipped: "file(s) could not be parsed and were skipped",
+    importNoMidi: "No readable .mid or .midi files were found",
+    localSessionHint: "Choose the folder again after refreshing the page",
     localComposer: "Local import",
     publicDomain: "Public domain · Mutopia Project",
     play: "Play",
@@ -436,16 +477,9 @@ const LIBRARY_SONGS: LibrarySong[] = [
   },
 ];
 
-const LOCAL_IMPORT_SONG: LibrarySong = {
-  id: "local-import",
-  title: { zh: "本地 MIDI", en: "Local MIDI" },
-  composer: { zh: "本地导入", en: "Local import" },
-  color: "#98d8c1",
-};
-
 const TIMBRE_BY_ID = new Map(TIMBRE_OPTIONS.map((option) => [option.id, option]));
 const SCENE_BY_ID = new Map(SCENE_OPTIONS.map((option) => [option.id, option]));
-const SONG_BY_ID = new Map([...LIBRARY_SONGS, LOCAL_IMPORT_SONG].map((song) => [song.id, song]));
+const SONG_BY_ID = new Map(LIBRARY_SONGS.map((song) => [song.id, song]));
 const PLAYBACK_MODES: PlaybackMode[] = ["sequential", "repeat-one", "shuffle"];
 const PLAYBACK_MODE_ICONS: Record<PlaybackMode, string> = {
   sequential: "☷",
@@ -501,7 +535,12 @@ async function parseMidiBuffer(buffer: ArrayBuffer): Promise<ParsedSong> {
       velocity: Math.max(0.12, note.velocity),
     })))
     .sort((a, b) => a.startSeconds - b.startSeconds || a.midi - b.midi);
-  return { notes, duration: Math.max(midi.duration, notes.at(-1)?.startSeconds ?? 0) };
+  return {
+    notes,
+    duration: Math.max(midi.duration, notes.at(-1)?.startSeconds ?? 0),
+    bpm: midi.header.tempos[0]?.bpm ?? null,
+    trackCount: midi.tracks.filter((track) => track.notes.length > 0).length,
+  };
 }
 
 function formatPlaybackTime(seconds: number) {
@@ -514,8 +553,25 @@ function localMidiTitle(fileName: string) {
   return fileName.replace(/\.(mid|midi)$/i, "").trim() || "Local MIDI";
 }
 
-function librarySongTitle(song: LibrarySong, locale: Locale, importedTitle: string) {
-  return song.id === "local-import" && importedTitle ? importedTitle : song.title[locale];
+function librarySongTitle(song: LibrarySong, locale: Locale) {
+  return song.title[locale];
+}
+
+function isLocalSongId(songId: SongId): songId is LocalSongId {
+  return songId.startsWith("local:");
+}
+
+function localSongId(file: File) {
+  const path = file.webkitRelativePath || file.name;
+  return `local:${path}:${file.size}:${file.lastModified}` as LocalSongId;
+}
+
+function localSongPath(file: File) {
+  return file.webkitRelativePath || file.name;
+}
+
+function isMidiFile(file: File) {
+  return /\.(mid|midi)$/i.test(file.name);
 }
 
 function playbackModeLabel(mode: PlaybackMode, locale: Locale) {
@@ -528,13 +584,13 @@ function nextPlaybackMode(mode: PlaybackMode) {
   return PLAYBACK_MODES[(currentIndex + 1) % PLAYBACK_MODES.length];
 }
 
-function nextLibrarySongId(currentSongId: SongId, mode: Exclude<PlaybackMode, "repeat-one">) {
-  const currentIndex = LIBRARY_SONGS.findIndex((song) => song.id === currentSongId);
+function nextLibrarySongId(currentSongId: SongId, mode: Exclude<PlaybackMode, "repeat-one">, songs: LibrarySong[]) {
+  const currentIndex = songs.findIndex((song) => song.id === currentSongId);
   if (mode === "sequential") {
-    return LIBRARY_SONGS[(currentIndex + 1 + LIBRARY_SONGS.length) % LIBRARY_SONGS.length].id;
+    return songs[(currentIndex + 1 + songs.length) % songs.length]?.id ?? LIBRARY_SONGS[0].id;
   }
-  const candidates = LIBRARY_SONGS.filter((song) => song.id !== currentSongId);
-  return candidates[Math.floor(Math.random() * candidates.length)]?.id ?? LIBRARY_SONGS[0].id;
+  const candidates = songs.filter((song) => song.id !== currentSongId);
+  return candidates[Math.floor(Math.random() * candidates.length)]?.id ?? songs[0]?.id ?? LIBRARY_SONGS[0].id;
 }
 
 function nearestSample(midi: number, buffers: Map<number, AudioBuffer>, definitions: SampleDefinition[]) {
@@ -556,6 +612,7 @@ function PianoOctave({
   octave,
   keys,
   activeCodes,
+  activeMidis,
   enabled = true,
   locale,
   autoMidis,
@@ -564,6 +621,7 @@ function PianoOctave({
   octave: number;
   keys: KeyDefinition[];
   activeCodes: Set<string>;
+  activeMidis: Set<number>;
   enabled?: boolean;
   locale: Locale;
   autoMidis: Set<number>;
@@ -580,20 +638,28 @@ function PianoOctave({
         : `${title} C${octave} to B${octave}, ${enabled ? copy.currentPlayable : copy.waitingSwitch}`}
     >
       <div className="white-keys">
-        {naturals.map((key) => (
-          <div className={`piano-key white ${enabled && activeCodes.has(key.code) ? "active" : ""} ${autoMidis.has(12 * (octave + 1) + key.semitone) ? "auto-active" : ""}`} key={key.code} data-key-code={key.code}>
+        {naturals.map((key) => {
+          const midi = 12 * (octave + 1) + key.semitone;
+          return (
+          <div className={`piano-key white ${(enabled && activeCodes.has(key.code)) || activeMidis.has(midi) ? "active" : ""} ${autoMidis.has(midi) ? "auto-active" : ""}`} key={key.code} data-key-code={key.code} data-midi={midi} role="button" aria-label={`${NOTE_NAMES[key.semitone]}${octave}`}>
             <div className="piano-key-label">
               <kbd>{keyDisplayLabel(key, locale)}</kbd>
               <span>{NOTE_NAMES[key.semitone]}{octave}</span>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
-      {accidentals.map((key) => (
+      {accidentals.map((key) => {
+        const midi = 12 * (octave + 1) + key.semitone;
+        return (
         <div
-          className={`piano-key black ${enabled && activeCodes.has(key.code) ? "active" : ""} ${autoMidis.has(12 * (octave + 1) + key.semitone) ? "auto-active" : ""}`}
+          className={`piano-key black ${(enabled && activeCodes.has(key.code)) || activeMidis.has(midi) ? "active" : ""} ${autoMidis.has(midi) ? "auto-active" : ""}`}
           key={key.code}
           data-key-code={key.code}
+          data-midi={midi}
+          role="button"
+          aria-label={`${NOTE_NAMES[key.semitone]}${octave}`}
           style={{ left: blackKeyLeft(key.semitone) }}
         >
           <div className="piano-key-label">
@@ -601,7 +667,8 @@ function PianoOctave({
             <span>{NOTE_NAMES[key.semitone]}{octave}</span>
           </div>
         </div>
-      ))}
+        );
+      })}
       <div className="octave-caption">C{octave}—B{octave} · {enabled ? copy.current : copy.waitingSwitch}</div>
     </section>
   );
@@ -611,21 +678,25 @@ export default function Home() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const sampleLibrariesRef = useRef(new Map<SampleBankKey, Map<number, AudioBuffer>>());
+  const sampleLoadPromisesRef = useRef(new Map<SampleBankKey, Promise<Map<number, AudioBuffer>>>());
   const voicesRef = useRef(new Map<string, Voice>());
   const autoVoicesRef = useRef(new Map<string, Voice>());
   const autoMidiCountsRef = useRef(new Map<number, number>());
   const autoVisualTimersRef = useRef<number[]>([]);
   const autoSchedulerRef = useRef<number | null>(null);
   const parsedSongsRef = useRef(new Map<SongId, ParsedSong>());
-  const importedSongTitleRef = useRef("");
+  const localLibrarySongsRef = useRef<LocalLibrarySong[]>([]);
   const playbackRef = useRef({ notes: [] as SongNote[], nextIndex: 0, offset: 0, startedAt: 0, duration: 0, speed: 1 });
   const playbackModeRef = useRef<PlaybackMode>("sequential");
   const selectedSongIdRef = useRef<SongId>("fur-elise");
   const beginLibraryPlaybackRef = useRef<((offset?: number, speedOverride?: number, songIdOverride?: SongId) => Promise<void>) | null>(null);
   const activeCodesRef = useRef(new Set<string>());
+  const pointerNotesRef = useRef(new Map<number, { token: string; midi: number; started: boolean }>());
+  const pointerMidiCountsRef = useRef(new Map<number, number>());
   const particleLayerRef = useRef<HTMLDivElement | null>(null);
   const controlDockRef = useRef<HTMLElement | null>(null);
   const midiInputRef = useRef<HTMLInputElement | null>(null);
+  const midiFolderInputRef = useRef<HTMLInputElement | null>(null);
   const ambientBuffersRef = useRef(new Map<SceneId, AudioBuffer>());
   const ambientVoiceRef = useRef<AmbientVoice | null>(null);
   const ambientEnabledRef = useRef(false);
@@ -664,7 +735,12 @@ export default function Home() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>("sequential");
   const [autoMidis, setAutoMidis] = useState<Set<number>>(new Set());
-  const [importedSongTitle, setImportedSongTitle] = useState("");
+  const [pointerMidis, setPointerMidis] = useState<Set<number>>(new Set());
+  const [localLibrarySongs, setLocalLibrarySongs] = useState<LocalLibrarySong[]>([]);
+  const [localLibrarySearch, setLocalLibrarySearch] = useState("");
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
+  const [importSummary, setImportSummary] = useState("");
+  const [isMidiDragActive, setIsMidiDragActive] = useState(false);
   const [activeCodes, setActiveCodes] = useState<Set<string>>(new Set());
   const [lastNote, setLastNote] = useState<string>(UI_COPY.zh.waitingSource);
   const [lastScheduleMs, setLastScheduleMs] = useState(0);
@@ -696,7 +772,10 @@ export default function Home() {
   const releaseAll = useCallback((releaseSeconds = 0.08) => {
     [...voicesRef.current.keys()].forEach((code) => releaseVoice(code, releaseSeconds));
     activeCodesRef.current.clear();
+    pointerNotesRef.current.clear();
+    pointerMidiCountsRef.current.clear();
     setActiveCodes(new Set());
+    setPointerMidis(new Set());
   }, [releaseVoice]);
 
   const toggleArticulation = useCallback(() => {
@@ -733,31 +812,17 @@ export default function Home() {
     while (layer.childElementCount > 180) layer.firstElementChild?.remove();
   }, []);
 
-  const spawnNoteLight = useCallback((key: KeyDefinition) => {
-    const groupIndex = key.group === "extreme"
-      ? (extremeOctaveRef.current === 1 ? 0 : 5)
-      : key.group === "low"
-        ? (lowOctaveRef.current === 2 ? 1 : 2)
-        : key.group === "mid"
-          ? 3
-          : 4;
-    const localX = key.accidental
-      ? (BLACK_KEY_BOUNDARY.get(key.semitone) ?? 0) / 7
-      : ((WHITE_KEY_INDEX.get(key.semitone) ?? 0) + 0.5) / 7;
-    emitNoteLight(((groupIndex + localX) / 6) * 100);
-  }, [emitNoteLight]);
-
-  const spawnAutoNoteLight = useCallback((midi: number) => {
+  const spawnMidiNoteLight = useCallback((midi: number, automatic = false) => {
     const octave = Math.floor(midi / 12) - 1;
     if (octave < 1 || octave > 6) return;
     const semitone = midi % 12;
     const localX = BLACK_KEY_BOUNDARY.has(semitone)
       ? (BLACK_KEY_BOUNDARY.get(semitone) ?? 0) / 7
       : ((WHITE_KEY_INDEX.get(semitone) ?? 0) + 0.5) / 7;
-    emitNoteLight((((octave - 1) + localX) / 6) * 100, true);
+    emitNoteLight((((octave - 1) + localX) / 6) * 100, automatic);
   }, [emitNoteLight]);
 
-  const startVoice = useCallback((code: string, key: KeyDefinition, eventStartedAt: number) => {
+  const startMidiVoice = useCallback((code: string, midi: number, eventStartedAt: number, noteLabel: string) => {
     const context = audioContextRef.current;
     const master = masterGainRef.current;
     const currentTimbre = TIMBRE_BY_ID.get(timbreRef.current) ?? TIMBRE_OPTIONS[0];
@@ -765,7 +830,6 @@ export default function Home() {
     const buffers = sampleLibrariesRef.current.get(currentTimbre.bank);
     if (!context || !master || !buffers || context.state !== "running") return false;
 
-    const midi = keyToMidi(key, lowOctaveRef.current, extremeOctaveRef.current);
     const sample = nearestSample(midi, buffers, bank.samples);
     if (!sample) return false;
 
@@ -790,7 +854,7 @@ export default function Home() {
     }
 
     source.start(now);
-    spawnNoteLight(key);
+    spawnMidiNoteLight(midi);
 
     const voice = { source, gain };
     voicesRef.current.set(code, voice);
@@ -807,20 +871,39 @@ export default function Home() {
     setP95ScheduleMs(percentile95(measurements));
     const currentLocale = localeRef.current;
     const copy = UI_COPY[currentLocale];
-    setLastNote(`${keyToNote(key, lowOctaveRef.current, extremeOctaveRef.current)} · ${keyDisplayLabel(key, currentLocale)} · ${currentTimbre.label[currentLocale]} · ${articulationRef.current === "long" ? copy.long : copy.short}`);
+    setLastNote(`${noteLabel} · ${currentTimbre.label[currentLocale]} · ${articulationRef.current === "long" ? copy.long : copy.short}`);
     return true;
-  }, [spawnNoteLight]);
+  }, [spawnMidiNoteLight]);
+
+  const startVoice = useCallback((code: string, key: KeyDefinition, eventStartedAt: number) => {
+    const currentLocale = localeRef.current;
+    return startMidiVoice(
+      code,
+      keyToMidi(key, lowOctaveRef.current, extremeOctaveRef.current),
+      eventStartedAt,
+      `${keyToNote(key, lowOctaveRef.current, extremeOctaveRef.current)} · ${keyDisplayLabel(key, currentLocale)}`,
+    );
+  }, [startMidiVoice]);
 
   const ensureSampleBank = useCallback(async (context: AudioContext, bankKey: SampleBankKey) => {
     const existing = sampleLibrariesRef.current.get(bankKey);
     if (existing) return existing;
+    const pending = sampleLoadPromisesRef.current.get(bankKey);
+    if (pending) return pending;
     const bank = SAMPLE_BANKS[bankKey];
     setAudioStatus("loading");
     setSampleProgress(0);
     setSampleTotal(bank.samples.length);
-    const buffers = await loadSampleBank(context, bank, setSampleProgress);
-    sampleLibrariesRef.current.set(bankKey, buffers);
-    return buffers;
+    const loadPromise = loadSampleBank(context, bank, setSampleProgress).then((buffers) => {
+      sampleLibrariesRef.current.set(bankKey, buffers);
+      return buffers;
+    });
+    sampleLoadPromisesRef.current.set(bankKey, loadPromise);
+    try {
+      return await loadPromise;
+    } finally {
+      sampleLoadPromisesRef.current.delete(bankKey);
+    }
   }, []);
 
   const fadeOutAmbientVoice = useCallback((fadeSeconds = AMBIENT_CROSSFADE_SECONDS) => {
@@ -1063,7 +1146,7 @@ export default function Home() {
     const visualOn = window.setTimeout(() => {
       autoMidiCountsRef.current.set(note.midi, (autoMidiCountsRef.current.get(note.midi) ?? 0) + 1);
       setAutoMidis((current) => new Set(current).add(note.midi));
-      spawnAutoNoteLight(note.midi);
+      spawnMidiNoteLight(note.midi, true);
     }, visualDelay);
     const visualOff = window.setTimeout(() => {
       const remaining = Math.max(0, (autoMidiCountsRef.current.get(note.midi) ?? 1) - 1);
@@ -1079,7 +1162,17 @@ export default function Home() {
       }
     }, visualDelay + Math.max(90, soundingDuration * 1000));
     autoVisualTimersRef.current.push(visualOn, visualOff);
-  }, [spawnAutoNoteLight]);
+  }, [spawnMidiNoteLight]);
+
+  const findLibrarySong = useCallback((songId: SongId) => {
+    return SONG_BY_ID.get(songId as BuiltInSongId)
+      ?? localLibrarySongsRef.current.find((song) => song.id === songId)
+      ?? LIBRARY_SONGS[0];
+  }, []);
+
+  const currentLibraryQueue = useCallback((): LibrarySong[] => {
+    return [...LIBRARY_SONGS, ...localLibrarySongsRef.current];
+  }, []);
 
   const loadLibrarySong = useCallback(async (song: LibrarySong) => {
     const cached = parsedSongsRef.current.get(song.id);
@@ -1093,9 +1186,9 @@ export default function Home() {
   }, []);
 
   const beginLibraryPlayback = useCallback(async (offset?: number, speedOverride?: number, songIdOverride?: SongId) => {
-    const song = SONG_BY_ID.get(songIdOverride ?? selectedSongIdRef.current) ?? LIBRARY_SONGS[0];
+    const song = findLibrarySong(songIdOverride ?? selectedSongIdRef.current);
     const copy = UI_COPY[localeRef.current];
-    const title = librarySongTitle(song, localeRef.current, importedSongTitleRef.current);
+    const title = librarySongTitle(song, localeRef.current);
     const chosenSpeed = speedOverride ?? playbackSpeed;
     const chosenOffset = Math.max(0, offset ?? playbackRef.current.offset);
     setPlaybackState("loading");
@@ -1163,7 +1256,7 @@ export default function Home() {
           playback.nextIndex = 0;
           setPlaybackSeconds(0);
         } else {
-          const nextSongId = nextLibrarySongId(song.id, mode);
+          const nextSongId = nextLibrarySongId(song.id, mode, currentLibraryQueue());
           stopAutoScheduler();
           stopAutoSources();
           playback.offset = 0;
@@ -1182,7 +1275,7 @@ export default function Home() {
     };
     autoSchedulerRef.current = window.setInterval(tick, 25);
     tick();
-  }, [initializeAudio, loadLibrarySong, playbackSpeed, scheduleAutoNote, stopAutoScheduler, stopAutoSources]);
+  }, [currentLibraryQueue, findLibrarySong, initializeAudio, loadLibrarySong, playbackSpeed, scheduleAutoNote, stopAutoScheduler, stopAutoSources]);
 
   useEffect(() => {
     beginLibraryPlaybackRef.current = beginLibraryPlayback;
@@ -1196,10 +1289,10 @@ export default function Home() {
     stopAutoSources();
     setPlaybackSeconds(position);
     setPlaybackState("paused");
-    const song = SONG_BY_ID.get(selectedSongId) ?? LIBRARY_SONGS[0];
-    const title = librarySongTitle(song, localeRef.current, importedSongTitleRef.current);
+    const song = findLibrarySong(selectedSongId);
+    const title = librarySongTitle(song, localeRef.current);
     setLastNote(`${UI_COPY[localeRef.current].songPaused} · ${title}`);
-  }, [currentPlaybackPosition, selectedSongId, stopAutoScheduler, stopAutoSources]);
+  }, [currentPlaybackPosition, findLibrarySong, selectedSongId, stopAutoScheduler, stopAutoSources]);
 
   const resetLibraryPlayback = useCallback(() => {
     stopAutoScheduler();
@@ -1220,12 +1313,13 @@ export default function Home() {
   }, [resetLibraryPlayback]);
 
   const moveLibrarySong = useCallback((direction: -1 | 1) => {
-    const currentIndex = LIBRARY_SONGS.findIndex((song) => song.id === selectedSongId);
+    const songs = currentLibraryQueue();
+    const currentIndex = songs.findIndex((song) => song.id === selectedSongId);
     const nextIndex = currentIndex < 0
-      ? (direction < 0 ? LIBRARY_SONGS.length - 1 : 0)
-      : (currentIndex + direction + LIBRARY_SONGS.length) % LIBRARY_SONGS.length;
-    chooseLibrarySong(LIBRARY_SONGS[nextIndex].id);
-  }, [chooseLibrarySong, selectedSongId]);
+      ? (direction < 0 ? songs.length - 1 : 0)
+      : (currentIndex + direction + songs.length) % songs.length;
+    chooseLibrarySong(songs[nextIndex]?.id ?? LIBRARY_SONGS[0].id);
+  }, [chooseLibrarySong, currentLibraryQueue, selectedSongId]);
 
   const cyclePlaybackMode = useCallback(() => {
     const nextMode = nextPlaybackMode(playbackModeRef.current);
@@ -1260,26 +1354,149 @@ export default function Home() {
     if (wasPlaying) void beginLibraryPlayback(nextPosition);
   }, [beginLibraryPlayback, playbackState, stopAutoScheduler, stopAutoSources]);
 
-  const importLibraryMidi = useCallback(async (file: File | null) => {
-    if (!file) return;
+  const importLibraryMidis = useCallback(async (incomingFiles: Iterable<File>) => {
     const copy = UI_COPY[localeRef.current];
-    try {
-      const parsed = await parseMidiBuffer(await file.arrayBuffer());
-      if (!parsed.notes.length) throw new Error("Empty MIDI");
-      const title = localMidiTitle(file.name);
+    const files = Array.from(incomingFiles).filter(isMidiFile);
+    if (!files.length) {
+      setImportSummary(copy.importNoMidi);
+      setLastNote(copy.importNoMidi);
+      return;
+    }
+
+    setImportProgress({ current: 0, total: files.length });
+    setImportSummary("");
+    const importedSongs: LocalLibrarySong[] = [];
+    const failedFiles: string[] = [];
+
+    for (let index = 0; index < files.length; index += 1) {
+      const file = files[index];
+      try {
+        const parsed = await parseMidiBuffer(await file.arrayBuffer());
+        if (!parsed.notes.length) throw new Error("Empty MIDI");
+        const id = localSongId(file);
+        const title = localMidiTitle(file.name);
+        parsedSongsRef.current.set(id, parsed);
+        importedSongs.push({
+          id,
+          title: { zh: title, en: title },
+          composer: { zh: "本地 MIDI", en: "Local MIDI" },
+          color: "#98d8c1",
+          localPath: localSongPath(file),
+          bpm: parsed.bpm,
+          duration: parsed.duration,
+          noteCount: parsed.notes.length,
+        });
+      } catch {
+        failedFiles.push(file.name);
+      }
+      setImportProgress({ current: index + 1, total: files.length });
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+    }
+
+    const merged = new Map(localLibrarySongsRef.current.map((song) => [song.id, song]));
+    importedSongs.forEach((song) => merged.set(song.id, song));
+    const nextSongs = [...merged.values()].sort((a, b) => a.localPath.localeCompare(b.localPath, undefined, { numeric: true }));
+    localLibrarySongsRef.current = nextSongs;
+    setLocalLibrarySongs(nextSongs);
+    setImportProgress(null);
+
+    const successMessage = `${copy.importComplete} · ${nextSongs.length}`;
+    const failedMessage = failedFiles.length ? ` · ${failedFiles.length} ${copy.importSkipped}` : "";
+    setImportSummary(`${successMessage}${failedMessage}`);
+    if (importedSongs.length) {
+      const firstSong = importedSongs[0];
       resetLibraryPlayback();
-      parsedSongsRef.current.set("local-import", parsed);
-      importedSongTitleRef.current = title;
-      setImportedSongTitle(title);
-      setSelectedSongId("local-import");
-      setTrackDuration(parsed.duration);
+      selectedSongIdRef.current = firstSong.id;
+      setSelectedSongId(firstSong.id);
+      setTrackDuration(firstSong.duration);
       setPlaybackSeconds(0);
       playbackRef.current.offset = 0;
-      setLastNote(`${copy.midiLoaded} · ${title}`);
-    } catch {
+      setLastNote(`${copy.midiLoaded} · ${firstSong.title[localeRef.current]}`);
+    } else {
       setLastNote(copy.midiInvalid);
     }
   }, [resetLibraryPlayback]);
+
+  const clearLocalLibrary = useCallback(() => {
+    localLibrarySongsRef.current.forEach((song) => parsedSongsRef.current.delete(song.id));
+    localLibrarySongsRef.current = [];
+    setLocalLibrarySongs([]);
+    setLocalLibrarySearch("");
+    setImportSummary("");
+    if (isLocalSongId(selectedSongIdRef.current)) chooseLibrarySong("fur-elise");
+  }, [chooseLibrarySong]);
+
+  const markPointerMidiActive = useCallback((midi: number, active: boolean) => {
+    const currentCount = pointerMidiCountsRef.current.get(midi) ?? 0;
+    const nextCount = Math.max(0, currentCount + (active ? 1 : -1));
+    if (nextCount) pointerMidiCountsRef.current.set(midi, nextCount);
+    else pointerMidiCountsRef.current.delete(midi);
+    setPointerMidis(new Set(pointerMidiCountsRef.current.keys()));
+  }, []);
+
+  const releasePointerNote = useCallback((pointerId: number) => {
+    const pointerNote = pointerNotesRef.current.get(pointerId);
+    if (!pointerNote) return;
+    pointerNotesRef.current.delete(pointerId);
+    if (pointerNote.started) {
+      releaseVoice(pointerNote.token);
+      markPointerMidiActive(pointerNote.midi, false);
+    }
+  }, [markPointerMidiActive, releaseVoice]);
+
+  const beginPointerNote = useCallback((pointerId: number, midi: number) => {
+    releasePointerNote(pointerId);
+    const token = `pointer:${pointerId}:${midi}`;
+    const pendingNote = { token, midi, started: false };
+    pointerNotesRef.current.set(pointerId, pendingNote);
+
+    const startIfCurrent = () => {
+      if (pointerNotesRef.current.get(pointerId) !== pendingNote || pendingNote.started) return true;
+      const octave = Math.floor(midi / 12) - 1;
+      const semitone = midi % 12;
+      const started = startMidiVoice(token, midi, performance.now(), `${NOTE_NAMES[semitone]}${octave}`);
+      if (started) {
+        pendingNote.started = true;
+        markPointerMidiActive(midi, true);
+      }
+      return started;
+    };
+
+    if (!startIfCurrent()) {
+      void initializeAudio().then(() => {
+        startIfCurrent();
+      });
+    }
+  }, [initializeAudio, markPointerMidiActive, releasePointerNote, startMidiVoice]);
+
+  const pianoKeyFromPoint = useCallback((clientX: number, clientY: number) => {
+    return document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>(".piano-key[data-midi]") ?? null;
+  }, []);
+
+  const handlePianoPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    const key = (event.target as HTMLElement).closest<HTMLElement>(".piano-key[data-midi]");
+    if (!key) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    beginPointerNote(event.pointerId, Number(key.dataset.midi));
+  }, [beginPointerNote]);
+
+  const handlePianoPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointerNotesRef.current.has(event.pointerId)) return;
+    event.preventDefault();
+    const key = pianoKeyFromPoint(event.clientX, event.clientY);
+    if (!key) {
+      releasePointerNote(event.pointerId);
+      return;
+    }
+    const midi = Number(key.dataset.midi);
+    if (pointerNotesRef.current.get(event.pointerId)?.midi !== midi) beginPointerNote(event.pointerId, midi);
+  }, [beginPointerNote, pianoKeyFromPoint, releasePointerNote]);
+
+  const handlePianoPointerEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    releasePointerNote(event.pointerId);
+  }, [releasePointerNote]);
 
   const selectTimbre = useCallback(async (next: Timbre) => {
     if (next === timbreRef.current || audioStatus === "loading") return;
@@ -1583,15 +1800,22 @@ export default function Home() {
   }, [releaseAll, releaseVoice, startVoice, toggleArticulation]);
 
   const activeCodeSet = useMemo(() => activeCodes, [activeCodes]);
+  const filteredLocalSongs = useMemo(() => {
+    const query = localLibrarySearch.trim().toLocaleLowerCase();
+    if (!query) return localLibrarySongs;
+    return localLibrarySongs.filter((song) => `${song.title[locale]} ${song.localPath}`.toLocaleLowerCase().includes(query));
+  }, [localLibrarySearch, localLibrarySongs, locale]);
   const copy = UI_COPY[locale];
   const selectedTimbre = TIMBRE_BY_ID.get(timbre) ?? TIMBRE_OPTIONS[0];
   const selectedScene = SCENE_BY_ID.get(scene) ?? SCENE_OPTIONS[0];
-  const selectedSong = SONG_BY_ID.get(selectedSongId) ?? LIBRARY_SONGS[0];
-  const selectedSongTitle = librarySongTitle(selectedSong, locale, importedSongTitle);
+  const selectedSong = SONG_BY_ID.get(selectedSongId)
+    ?? localLibrarySongs.find((song) => song.id === selectedSongId)
+    ?? LIBRARY_SONGS[0];
+  const selectedSongTitle = librarySongTitle(selectedSong, locale);
   const selectedPlaybackModeLabel = playbackModeLabel(playbackMode, locale);
   const selectedTimbreLabel = selectedTimbre.label[locale];
   const selectedSceneLabel = selectedScene.label[locale];
-  const selectedSongReady = Boolean(selectedSong.midiUrl || (selectedSong.id === "local-import" && importedSongTitle));
+  const selectedSongReady = Boolean(selectedSong.midiUrl || isLocalSongId(selectedSong.id));
   const audioButtonText = audioStatus === "running"
     ? (locale === "zh" ? `${selectedTimbreLabel}已就绪` : `${selectedTimbreLabel} ready`)
     : audioStatus === "loading"
@@ -1605,7 +1829,7 @@ export default function Home() {
             : (locale === "zh" ? `加载并启动${selectedTimbreLabel}` : `Load & start ${selectedTimbreLabel}`);
 
   return (
-    <main className={`app-shell sunroom ${immersiveMode ? "immersive" : ""} ${activeCodes.size ? "playing" : ""}`} data-scene={scene} data-locale={locale}>
+    <main className={`app-shell sunroom ${immersiveMode ? "immersive" : ""} ${activeCodes.size || pointerMidis.size ? "playing" : ""}`} data-scene={scene} data-locale={locale}>
       <div className="scene-background" key={`poster-${scene}`} style={{ backgroundImage: `url(${selectedScene.image})` }} aria-hidden="true" />
       {videoEnabled && (
         <video
@@ -1723,25 +1947,72 @@ export default function Home() {
           })}
         </div>
 
-        <div className={`midi-import ${selectedSong.id === "local-import" ? "active" : ""}`}>
-          <button className="midi-import-main" type="button" onClick={() => midiInputRef.current?.click()}>
-            <i aria-hidden="true">＋</i>
-            <span><strong>{copy.importMidi}</strong><small>{copy.importHint}</small></span>
-          </button>
-          <small>{copy.localOnly}</small>
-          {importedSongTitle && (
-            <button className="imported-midi" type="button" onClick={() => chooseLibrarySong("local-import")}>
-              <span>{copy.imported}</span><strong>{importedSongTitle}</strong>
+        <div
+          className={`midi-import ${isLocalSongId(selectedSong.id) ? "active" : ""} ${isMidiDragActive ? "drag-active" : ""}`}
+          onDragEnter={(event) => { event.preventDefault(); setIsMidiDragActive(true); }}
+          onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setIsMidiDragActive(true); }}
+          onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsMidiDragActive(false); }}
+          onDrop={(event) => { event.preventDefault(); setIsMidiDragActive(false); void importLibraryMidis(event.dataTransfer.files); }}
+        >
+          <div className="midi-import-actions">
+            <button className="midi-import-main" type="button" onClick={() => midiInputRef.current?.click()}>
+              <i aria-hidden="true">＋</i>
+              <span><strong>{copy.importMidi}</strong><small>{copy.importHint}</small></span>
             </button>
+            <button className="midi-folder-button" type="button" onClick={() => midiFolderInputRef.current?.click()}>
+              <span aria-hidden="true">▤</span>{copy.importFolder}
+            </button>
+          </div>
+          <small>{copy.localOnly} · {copy.localSessionHint}</small>
+          {importProgress && (
+            <div className="midi-import-progress" role="status">
+              <span>{copy.importWorking}</span><strong>{importProgress.current} / {importProgress.total}</strong>
+              <i><b style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }} /></i>
+            </div>
           )}
-          <input ref={midiInputRef} type="file" accept=".mid,.midi,audio/midi,audio/x-midi" onChange={(event) => { void importLibraryMidi(event.target.files?.[0] ?? null); event.currentTarget.value = ""; }} />
+          {importSummary && !importProgress && <div className="midi-import-summary" role="status">{importSummary}</div>}
+          <input ref={midiInputRef} type="file" multiple accept=".mid,.midi,audio/midi,audio/x-midi" onChange={(event) => { if (event.target.files) void importLibraryMidis(event.target.files); event.currentTarget.value = ""; }} />
+          <input
+            ref={(input) => {
+              midiFolderInputRef.current = input;
+              if (input) {
+                input.setAttribute("webkitdirectory", "");
+                input.setAttribute("directory", "");
+              }
+            }}
+            type="file"
+            multiple
+            accept=".mid,.midi,audio/midi,audio/x-midi"
+            onChange={(event) => { if (event.target.files) void importLibraryMidis(event.target.files); event.currentTarget.value = ""; }}
+          />
         </div>
+
+        <section className="local-library-section" aria-label={copy.localLibrary}>
+          <div className="local-library-heading">
+            <span><strong>{copy.localLibrary}</strong><small>{localLibrarySongs.length}</small></span>
+            {localLibrarySongs.length > 0 && <button type="button" onClick={clearLocalLibrary}>{copy.clearLocalLibrary}</button>}
+          </div>
+          {localLibrarySongs.length > 0 ? (
+            <>
+              <input className="local-library-search" type="search" value={localLibrarySearch} placeholder={copy.localSearch} aria-label={copy.localSearch} onChange={(event) => setLocalLibrarySearch(event.target.value)} />
+              <div className="local-song-list" role="listbox" aria-label={copy.localLibrary}>
+                {filteredLocalSongs.map((song, index) => (
+                  <button className={selectedSongId === song.id ? "selected" : ""} type="button" role="option" aria-selected={selectedSongId === song.id} key={song.id} onClick={() => chooseLibrarySong(song.id)}>
+                    <i>{String(index + 1).padStart(2, "0")}</i>
+                    <span><strong>{song.title[locale]}</strong><small>{song.localPath}</small><em>{formatPlaybackTime(song.duration)}{song.bpm ? ` · ${Math.round(song.bpm)} BPM` : ""} · {song.noteCount} notes</em></span>
+                    <b>▶</b>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : <p className="local-library-empty">{copy.localLibraryEmpty}</p>}
+        </section>
 
         <div className="now-playing-card" style={{ "--song-color": selectedSong.color } as React.CSSProperties}>
           <div className="now-playing-copy">
             <small>{playbackState === "playing" ? copy.songPlaying : copy.available}</small>
             <strong>{selectedSongTitle}</strong>
-            <span>{selectedSong.id === "local-import" ? copy.localComposer : selectedSong.composer[locale]}</span>
+            <span>{selectedSong.composer[locale]}{selectedSong.localPath ? ` · ${selectedSong.localPath}` : ""}</span>
           </div>
 
           <div className="song-progress">
@@ -1809,13 +2080,21 @@ export default function Home() {
               <div className="current-note"><span>{copy.currentNote}</span><strong>{lastNote.split("·")[0].trim()}</strong></div>
               <i className="level-bars" aria-hidden="true"><b /><b /><b /><b /></i>
             </div>
-            <div className="piano-shell">
-              <PianoOctave title={copy.extendedRange} octave={1} keys={EXTREME_KEYS} activeCodes={activeCodeSet} enabled={extremeOctave === 1} locale={locale} autoMidis={autoMidis} />
-              <PianoOctave title={copy.lowRange} octave={2} keys={LOW_KEYS} activeCodes={activeCodeSet} enabled={lowOctave === 2} locale={locale} autoMidis={autoMidis} />
-              <PianoOctave title={copy.lowRange} octave={3} keys={LOW_KEYS} activeCodes={activeCodeSet} enabled={lowOctave === 3} locale={locale} autoMidis={autoMidis} />
-              <PianoOctave title={copy.midRange} octave={4} keys={MID_KEYS} activeCodes={activeCodeSet} locale={locale} autoMidis={autoMidis} />
-              <PianoOctave title={copy.highRange} octave={5} keys={HIGH_KEYS} activeCodes={activeCodeSet} locale={locale} autoMidis={autoMidis} />
-              <PianoOctave title={copy.extendedRange} octave={6} keys={EXTREME_KEYS} activeCodes={activeCodeSet} enabled={extremeOctave === 6} locale={locale} autoMidis={autoMidis} />
+            <div
+              className="piano-shell"
+              data-pointer-piano="true"
+              onPointerDown={handlePianoPointerDown}
+              onPointerMove={handlePianoPointerMove}
+              onPointerUp={handlePianoPointerEnd}
+              onPointerCancel={handlePianoPointerEnd}
+              onLostPointerCapture={handlePianoPointerEnd}
+            >
+              <PianoOctave title={copy.extendedRange} octave={1} keys={EXTREME_KEYS} activeCodes={activeCodeSet} activeMidis={pointerMidis} enabled={extremeOctave === 1} locale={locale} autoMidis={autoMidis} />
+              <PianoOctave title={copy.lowRange} octave={2} keys={LOW_KEYS} activeCodes={activeCodeSet} activeMidis={pointerMidis} enabled={lowOctave === 2} locale={locale} autoMidis={autoMidis} />
+              <PianoOctave title={copy.lowRange} octave={3} keys={LOW_KEYS} activeCodes={activeCodeSet} activeMidis={pointerMidis} enabled={lowOctave === 3} locale={locale} autoMidis={autoMidis} />
+              <PianoOctave title={copy.midRange} octave={4} keys={MID_KEYS} activeCodes={activeCodeSet} activeMidis={pointerMidis} locale={locale} autoMidis={autoMidis} />
+              <PianoOctave title={copy.highRange} octave={5} keys={HIGH_KEYS} activeCodes={activeCodeSet} activeMidis={pointerMidis} locale={locale} autoMidis={autoMidis} />
+              <PianoOctave title={copy.extendedRange} octave={6} keys={EXTREME_KEYS} activeCodes={activeCodeSet} activeMidis={pointerMidis} enabled={extremeOctave === 6} locale={locale} autoMidis={autoMidis} />
             </div>
           </div>
         </div>

@@ -71,8 +71,13 @@ test("server-renders the immersive six-range piano", async () => {
   assert.match(html, /蒲公英的约定/);
   assert.match(html, /花海/);
   assert.match(html, /致爱丽丝/);
-  assert.match(html, /导入本地 MIDI/);
-  assert.match(html, /不会上传服务器/);
+  assert.match(html, /选择 MIDI 文件/);
+  assert.match(html, /打开 MIDI 文件夹/);
+  assert.match(html, /本地音乐库/);
+  assert.match(html, /不上传服务器/);
+  assert.match(html, /data-pointer-piano="true"/);
+  assert.match(html, /data-midi="24"/);
+  assert.match(html, /data-midi="95"/);
   assert.match(html, /data-testid="playback-mode"/);
   assert.match(html, /aria-label="播放模式：顺序播放"/);
   assert.doesNotMatch(html, /你离开的事实|Call of Silence/);
@@ -101,7 +106,7 @@ test("Vercel deployment keeps the existing Sites build and uses the canonical pu
   assert.match(styles, /\.github-credit \{/);
 });
 
-test("appreciation mode schedules four built-in pieces while preserving generic local-only imports", async () => {
+test("appreciation mode schedules four built-in pieces and a local-only folder library", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const furEliseBuffer = await readFile(new URL("../public/midi/fur-elise.mid", import.meta.url));
   const mrLawrenceBuffer = await readFile(new URL("../public/midi/merry-christmas-mr-lawrence.mid", import.meta.url));
@@ -147,19 +152,24 @@ test("appreciation mode schedules four built-in pieces while preserving generic 
   assert.match(source, /setInterval\(tick, 25\)/);
   assert.match(source, /const songHorizon = position \+ 0\.16 \* playback\.speed/);
   assert.match(source, /source\.start\(startAt\)/);
-  assert.match(source, /spawnAutoNoteLight\(note\.midi\)/);
+  assert.match(source, /spawnMidiNoteLight\(note\.midi, true\)/);
   assert.match(source, /file\.arrayBuffer\(\)/);
-  const importHandler = source.slice(source.indexOf("const importLibraryMidi"), source.indexOf("const selectTimbre"));
+  const importHandler = source.slice(source.indexOf("const importLibraryMidis"), source.indexOf("const selectTimbre"));
   assert.doesNotMatch(importHandler, /fetch\(|FormData|XMLHttpRequest/);
   assert.match(importHandler, /localMidiTitle\(file\.name\)/);
-  assert.match(importHandler, /parsedSongsRef\.current\.set\("local-import", parsed\)/);
+  assert.match(importHandler, /parsedSongsRef\.current\.set\(id, parsed\)/);
+  assert.match(importHandler, /filter\(isMidiFile\)/);
+  assert.match(importHandler, /failedFiles\.push\(file\.name\)/);
+  assert.match(source, /input\.setAttribute\("webkitdirectory", ""\)/);
+  assert.match(source, /event\.dataTransfer\.files/);
+  assert.match(source, /localLibrarySongsRef\.current/);
   assert.match(source, /autoMidiCountsRef\.current\.set/);
   assert.match(source, /data-testid="library-toggle"/);
   assert.match(source, /type PlaybackMode = "sequential" \| "repeat-one" \| "shuffle"/);
   assert.match(source, /const PLAYBACK_MODES: PlaybackMode\[\] = \["sequential", "repeat-one", "shuffle"\]/);
   assert.match(source, /playbackModeRef\.current/);
-  assert.match(source, /const nextSongId = nextLibrarySongId\(song\.id, mode\)/);
-  assert.match(source, /const candidates = LIBRARY_SONGS\.filter\(\(song\) => song\.id !== currentSongId\)/);
+  assert.match(source, /const nextSongId = nextLibrarySongId\(song\.id, mode, currentLibraryQueue\(\)\)/);
+  assert.match(source, /const candidates = songs\.filter\(\(song\) => song\.id !== currentSongId\)/);
   assert.match(source, /beginLibraryPlaybackRef\.current\?\.\(0, playback\.speed, nextSongId\)/);
   assert.match(source, /\[0\.75, 1, 1\.25, 1\.5, 2\]/);
 });
@@ -246,7 +256,7 @@ test("the visual keyboard exposes all six octaves while keeping switchable group
   assert.match(source, /enabled=\{lowOctave === 3\}/);
   assert.match(source, /enabled=\{extremeOctave === 1\}/);
   assert.match(source, /enabled=\{extremeOctave === 6\}/);
-  assert.match(source, /emitNoteLight\(\(\(groupIndex \+ localX\) \/ 6\) \* 100\)/);
+  assert.match(source, /emitNoteLight\(\(\(\(octave - 1\) \+ localX\) \/ 6\) \* 100, automatic\)/);
 });
 
 test("short and long articulation use natural release envelopes", async () => {
@@ -261,11 +271,23 @@ test("short and long articulation use natural release envelopes", async () => {
 test("audio starts before the scene creates note particles", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const audioStart = source.indexOf("source.start(now);");
-  const visualStart = source.indexOf("spawnNoteLight(key);", audioStart);
+  const visualStart = source.indexOf("spawnMidiNoteLight(midi);", audioStart);
 
   assert.notEqual(audioStart, -1);
   assert.notEqual(visualStart, -1);
   assert.ok(audioStart < visualStart);
+});
+
+test("pointer piano supports mouse, glide and multi-touch across all visible octaves", async () => {
+  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(source, /pointerNotesRef = useRef\(new Map<number/);
+  assert.match(source, /event\.currentTarget\.setPointerCapture\(event\.pointerId\)/);
+  assert.match(source, /document\.elementFromPoint\(clientX, clientY\)/);
+  assert.match(source, /onPointerMove=\{handlePianoPointerMove\}/);
+  assert.match(source, /onPointerCancel=\{handlePianoPointerEnd\}/);
+  assert.match(source, /data-midi=\{midi\}/);
+  assert.match(styles, /\.piano-key \{[^}]*touch-action: none/);
 });
 
 test("all note particles share the scene's full rise height", async () => {
