@@ -116,6 +116,9 @@ test("appreciation mode schedules four built-in pieces while preserving generic 
   const mrLawrenceNotes = mrLawrence.tracks.flatMap((track) => track.notes);
   const dandelionsNotes = dandelions.tracks.flatMap((track) => track.notes);
   const flowerSeaNotes = flowerSea.tracks.flatMap((track) => track.notes);
+  const flowerSeaNoteKeys = flowerSea.tracks.flatMap((track, trackIndex) =>
+    track.notes.map((note) => `${trackIndex}:${note.ticks}:${note.midi}`),
+  );
 
   assert.ok(furEliseNotes.length > 800);
   assert.ok(furElise.duration > 120);
@@ -124,11 +127,19 @@ test("appreciation mode schedules four built-in pieces while preserving generic 
   assert.ok(dandelionsNotes.length > 800);
   assert.ok(dandelions.duration > 240);
   assert.equal(flowerSea.tracks.length, 2);
-  assert.ok(flowerSeaNotes.length > 750);
-  assert.ok(flowerSea.duration > 155 && flowerSea.duration < 165);
+  assert.equal(flowerSeaNotes.length, 769);
+  assert.ok(Math.abs(flowerSea.duration - 158.4) < 0.001);
   assert.equal(flowerSea.header.tempos[0]?.bpm, 75);
-  assert.ok(Math.min(...flowerSeaNotes.map((note) => note.midi)) >= 24);
-  assert.ok(Math.max(...flowerSeaNotes.map((note) => note.midi)) <= 95);
+  assert.deepEqual(
+    flowerSea.header.timeSignatures.map(({ ticks, timeSignature }) => ({ ticks, timeSignature })),
+    [
+      { ticks: 0, timeSignature: [2, 4] },
+      { ticks: 960, timeSignature: [4, 4] },
+    ],
+  );
+  assert.equal(Math.min(...flowerSeaNotes.map((note) => note.midi)), 37);
+  assert.equal(Math.max(...flowerSeaNotes.map((note) => note.midi)), 93);
+  assert.equal(new Set(flowerSeaNoteKeys).size, flowerSeaNoteKeys.length);
   assert.match(source, /midiUrl: "\/midi\/fur-elise\.mid"/);
   assert.match(source, /midiUrl: "\/midi\/merry-christmas-mr-lawrence\.mid"/);
   assert.match(source, /midiUrl: "\/midi\/dandelions-promise\.mid"/);
