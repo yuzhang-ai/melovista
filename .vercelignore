@@ -4,9 +4,7 @@ node_modules
 .vinext
 .wrangler
 dist
-build
 
 # Local-only working files and delivery artifacts
 work
 outputs
-
