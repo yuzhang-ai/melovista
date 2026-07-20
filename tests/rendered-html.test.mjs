@@ -69,6 +69,7 @@ test("server-renders the immersive six-range piano", async () => {
   assert.match(html, /钢琴曲库/);
   assert.match(html, /圣诞快乐，劳伦斯先生/);
   assert.match(html, /蒲公英的约定/);
+  assert.match(html, /花海/);
   assert.match(html, /致爱丽丝/);
   assert.match(html, /导入本地 MIDI/);
   assert.match(html, /不会上传服务器/);
@@ -98,18 +99,21 @@ test("Vercel deployment keeps the existing Sites build and uses the canonical pu
   assert.match(styles, /\.github-credit \{/);
 });
 
-test("appreciation mode schedules three built-in pieces while preserving generic local-only imports", async () => {
+test("appreciation mode schedules four built-in pieces while preserving generic local-only imports", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const furEliseBuffer = await readFile(new URL("../public/midi/fur-elise.mid", import.meta.url));
   const mrLawrenceBuffer = await readFile(new URL("../public/midi/merry-christmas-mr-lawrence.mid", import.meta.url));
   const dandelionsBuffer = await readFile(new URL("../public/midi/dandelions-promise.mid", import.meta.url));
+  const flowerSeaBuffer = await readFile(new URL("../public/midi/flower-sea.mid", import.meta.url));
   const { Midi } = require("@tonejs/midi");
   const furElise = new Midi(furEliseBuffer);
   const mrLawrence = new Midi(mrLawrenceBuffer);
   const dandelions = new Midi(dandelionsBuffer);
+  const flowerSea = new Midi(flowerSeaBuffer);
   const furEliseNotes = furElise.tracks.flatMap((track) => track.notes);
   const mrLawrenceNotes = mrLawrence.tracks.flatMap((track) => track.notes);
   const dandelionsNotes = dandelions.tracks.flatMap((track) => track.notes);
+  const flowerSeaNotes = flowerSea.tracks.flatMap((track) => track.notes);
 
   assert.ok(furEliseNotes.length > 800);
   assert.ok(furElise.duration > 120);
@@ -117,9 +121,16 @@ test("appreciation mode schedules three built-in pieces while preserving generic
   assert.ok(mrLawrence.duration > 300);
   assert.ok(dandelionsNotes.length > 800);
   assert.ok(dandelions.duration > 240);
+  assert.equal(flowerSea.tracks.length, 2);
+  assert.ok(flowerSeaNotes.length > 750);
+  assert.ok(flowerSea.duration > 155 && flowerSea.duration < 165);
+  assert.equal(flowerSea.header.tempos[0]?.bpm, 75);
+  assert.ok(Math.min(...flowerSeaNotes.map((note) => note.midi)) >= 24);
+  assert.ok(Math.max(...flowerSeaNotes.map((note) => note.midi)) <= 95);
   assert.match(source, /midiUrl: "\/midi\/fur-elise\.mid"/);
   assert.match(source, /midiUrl: "\/midi\/merry-christmas-mr-lawrence\.mid"/);
   assert.match(source, /midiUrl: "\/midi\/dandelions-promise\.mid"/);
+  assert.match(source, /midiUrl: "\/midi\/flower-sea\.mid"/);
   assert.match(source, /setInterval\(tick, 25\)/);
   assert.match(source, /const songHorizon = position \+ 0\.16 \* playback\.speed/);
   assert.match(source, /source\.start\(startAt\)/);

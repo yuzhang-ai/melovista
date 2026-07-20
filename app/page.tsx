@@ -14,7 +14,7 @@ type Articulation = "short" | "long";
 type Timbre = "acoustic" | "bright" | "violin" | "guitar" | "saxophone";
 type SceneId = "coast" | "forest" | "rain" | "stars";
 type Locale = "zh" | "en";
-type SongId = "merry-christmas-mr-lawrence" | "dandelions-promise" | "fur-elise" | "local-import";
+type SongId = "merry-christmas-mr-lawrence" | "dandelions-promise" | "flower-sea" | "fur-elise" | "local-import";
 type OpenMenu = "scene" | "timbre" | null;
 type SampleBankKey = Exclude<Timbre, "bright">;
 type AudioStatus = "idle" | "starting" | "loading" | "running" | "suspended" | "error";
@@ -410,6 +410,13 @@ const LIBRARY_SONGS: LibrarySong[] = [
     composer: { zh: "周杰伦", en: "Jay Chou" },
     color: "#d9e59a",
     midiUrl: "/midi/dandelions-promise.mid",
+  },
+  {
+    id: "flower-sea",
+    title: { zh: "花海", en: "Flower Sea" },
+    composer: { zh: "周杰伦", en: "Jay Chou" },
+    color: "#e7a9c4",
+    midiUrl: "/midi/flower-sea.mid",
   },
   {
     id: "fur-elise",
