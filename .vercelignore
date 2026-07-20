@@ -1,0 +1,12 @@
+# Local dependencies and generated build output
+node_modules
+.next
+.vinext
+.wrangler
+dist
+build
+
+# Local-only working files and delivery artifacts
+work
+outputs
+
