@@ -73,6 +73,8 @@ test("server-renders the immersive six-range piano", async () => {
   assert.match(html, /致爱丽丝/);
   assert.match(html, /导入本地 MIDI/);
   assert.match(html, /不会上传服务器/);
+  assert.match(html, /data-testid="playback-mode"/);
+  assert.match(html, /aria-label="播放模式：顺序播放"/);
   assert.doesNotMatch(html, /你离开的事实|Call of Silence/);
   assert.match(html, /LEFT ALT/);
   assert.match(html, /data-testid="articulation-mode">短音/);
@@ -142,6 +144,12 @@ test("appreciation mode schedules four built-in pieces while preserving generic 
   assert.match(importHandler, /parsedSongsRef\.current\.set\("local-import", parsed\)/);
   assert.match(source, /autoMidiCountsRef\.current\.set/);
   assert.match(source, /data-testid="library-toggle"/);
+  assert.match(source, /type PlaybackMode = "sequential" \| "repeat-one" \| "shuffle"/);
+  assert.match(source, /const PLAYBACK_MODES: PlaybackMode\[\] = \["sequential", "repeat-one", "shuffle"\]/);
+  assert.match(source, /playbackModeRef\.current/);
+  assert.match(source, /const nextSongId = nextLibrarySongId\(song\.id, mode\)/);
+  assert.match(source, /const candidates = LIBRARY_SONGS\.filter\(\(song\) => song\.id !== currentSongId\)/);
+  assert.match(source, /beginLibraryPlaybackRef\.current\?\.\(0, playback\.speed, nextSongId\)/);
   assert.match(source, /\[0\.75, 1, 1\.25, 1\.5, 2\]/);
 });
 

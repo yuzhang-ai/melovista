@@ -19,6 +19,7 @@ type OpenMenu = "scene" | "timbre" | null;
 type SampleBankKey = Exclude<Timbre, "bright">;
 type AudioStatus = "idle" | "starting" | "loading" | "running" | "suspended" | "error";
 type PlaybackState = "idle" | "loading" | "playing" | "paused";
+type PlaybackMode = "sequential" | "repeat-one" | "shuffle";
 
 type Voice = {
   source: AudioBufferSourceNode;
@@ -212,7 +213,10 @@ const UI_COPY = {
     pause: "暂停",
     previous: "上一首",
     next: "下一首",
-    loop: "循环",
+    playbackMode: "播放模式",
+    sequential: "顺序播放",
+    repeatOne: "单曲循环",
+    shuffle: "随机播放",
     speed: "速度",
     openPerformance: "性能信息",
     closeLibrary: "关闭曲库",
@@ -292,7 +296,10 @@ const UI_COPY = {
     pause: "Pause",
     previous: "Previous",
     next: "Next",
-    loop: "Loop",
+    playbackMode: "Playback mode",
+    sequential: "Sequential",
+    repeatOne: "Repeat one",
+    shuffle: "Shuffle",
     speed: "Speed",
     openPerformance: "Performance info",
     closeLibrary: "Close library",
@@ -439,6 +446,12 @@ const LOCAL_IMPORT_SONG: LibrarySong = {
 const TIMBRE_BY_ID = new Map(TIMBRE_OPTIONS.map((option) => [option.id, option]));
 const SCENE_BY_ID = new Map(SCENE_OPTIONS.map((option) => [option.id, option]));
 const SONG_BY_ID = new Map([...LIBRARY_SONGS, LOCAL_IMPORT_SONG].map((song) => [song.id, song]));
+const PLAYBACK_MODES: PlaybackMode[] = ["sequential", "repeat-one", "shuffle"];
+const PLAYBACK_MODE_ICONS: Record<PlaybackMode, string> = {
+  sequential: "☷",
+  "repeat-one": "↻",
+  shuffle: "⇄",
+};
 const WHITE_KEY_INDEX = new Map([[0, 0], [2, 1], [4, 2], [5, 3], [7, 4], [9, 5], [11, 6]]);
 const BLACK_KEY_BOUNDARY = new Map([[1, 1], [3, 2], [6, 4], [8, 5], [10, 6]]);
 
@@ -503,6 +516,25 @@ function localMidiTitle(fileName: string) {
 
 function librarySongTitle(song: LibrarySong, locale: Locale, importedTitle: string) {
   return song.id === "local-import" && importedTitle ? importedTitle : song.title[locale];
+}
+
+function playbackModeLabel(mode: PlaybackMode, locale: Locale) {
+  const copy = UI_COPY[locale];
+  return mode === "repeat-one" ? copy.repeatOne : mode === "shuffle" ? copy.shuffle : copy.sequential;
+}
+
+function nextPlaybackMode(mode: PlaybackMode) {
+  const currentIndex = PLAYBACK_MODES.indexOf(mode);
+  return PLAYBACK_MODES[(currentIndex + 1) % PLAYBACK_MODES.length];
+}
+
+function nextLibrarySongId(currentSongId: SongId, mode: Exclude<PlaybackMode, "repeat-one">) {
+  const currentIndex = LIBRARY_SONGS.findIndex((song) => song.id === currentSongId);
+  if (mode === "sequential") {
+    return LIBRARY_SONGS[(currentIndex + 1 + LIBRARY_SONGS.length) % LIBRARY_SONGS.length].id;
+  }
+  const candidates = LIBRARY_SONGS.filter((song) => song.id !== currentSongId);
+  return candidates[Math.floor(Math.random() * candidates.length)]?.id ?? LIBRARY_SONGS[0].id;
 }
 
 function nearestSample(midi: number, buffers: Map<number, AudioBuffer>, definitions: SampleDefinition[]) {
@@ -587,7 +619,9 @@ export default function Home() {
   const parsedSongsRef = useRef(new Map<SongId, ParsedSong>());
   const importedSongTitleRef = useRef("");
   const playbackRef = useRef({ notes: [] as SongNote[], nextIndex: 0, offset: 0, startedAt: 0, duration: 0, speed: 1 });
-  const loopSongRef = useRef(false);
+  const playbackModeRef = useRef<PlaybackMode>("sequential");
+  const selectedSongIdRef = useRef<SongId>("fur-elise");
+  const beginLibraryPlaybackRef = useRef<((offset?: number, speedOverride?: number, songIdOverride?: SongId) => Promise<void>) | null>(null);
   const activeCodesRef = useRef(new Set<string>());
   const particleLayerRef = useRef<HTMLDivElement | null>(null);
   const controlDockRef = useRef<HTMLElement | null>(null);
@@ -628,7 +662,7 @@ export default function Home() {
   const [playbackSeconds, setPlaybackSeconds] = useState(0);
   const [trackDuration, setTrackDuration] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [loopSong, setLoopSong] = useState(false);
+  const [playbackMode, setPlaybackMode] = useState<PlaybackMode>("sequential");
   const [autoMidis, setAutoMidis] = useState<Set<number>>(new Set());
   const [importedSongTitle, setImportedSongTitle] = useState("");
   const [activeCodes, setActiveCodes] = useState<Set<string>>(new Set());
@@ -1058,8 +1092,8 @@ export default function Home() {
     return parsed;
   }, []);
 
-  const beginLibraryPlayback = useCallback(async (offset?: number, speedOverride?: number) => {
-    const song = SONG_BY_ID.get(selectedSongId) ?? LIBRARY_SONGS[0];
+  const beginLibraryPlayback = useCallback(async (offset?: number, speedOverride?: number, songIdOverride?: SongId) => {
+    const song = SONG_BY_ID.get(songIdOverride ?? selectedSongIdRef.current) ?? LIBRARY_SONGS[0];
     const copy = UI_COPY[localeRef.current];
     const title = librarySongTitle(song, localeRef.current, importedSongTitleRef.current);
     const chosenSpeed = speedOverride ?? playbackSpeed;
@@ -1121,25 +1155,38 @@ export default function Home() {
         playback.nextIndex += 1;
       }
       if (position >= playback.duration) {
-        if (loopSongRef.current) {
+        const mode = playbackModeRef.current;
+        if (mode === "repeat-one") {
           stopAutoSources();
           playback.offset = 0;
           playback.startedAt = liveContext.currentTime + 0.12;
           playback.nextIndex = 0;
           setPlaybackSeconds(0);
         } else {
+          const nextSongId = nextLibrarySongId(song.id, mode);
           stopAutoScheduler();
           stopAutoSources();
           playback.offset = 0;
           playback.startedAt = 0;
-          setPlaybackState("idle");
-          setLastNote(`${copy.songFinished} · ${title}`);
+          playback.nextIndex = 0;
+          selectedSongIdRef.current = nextSongId;
+          setSelectedSongId(nextSongId);
+          setTrackDuration(parsedSongsRef.current.get(nextSongId)?.duration ?? 0);
+          setPlaybackSeconds(0);
+          setPlaybackState("loading");
+          window.setTimeout(() => {
+            void beginLibraryPlaybackRef.current?.(0, playback.speed, nextSongId);
+          }, 120);
         }
       }
     };
     autoSchedulerRef.current = window.setInterval(tick, 25);
     tick();
-  }, [initializeAudio, loadLibrarySong, playbackSpeed, scheduleAutoNote, selectedSongId, stopAutoScheduler, stopAutoSources]);
+  }, [initializeAudio, loadLibrarySong, playbackSpeed, scheduleAutoNote, stopAutoScheduler, stopAutoSources]);
+
+  useEffect(() => {
+    beginLibraryPlaybackRef.current = beginLibraryPlayback;
+  }, [beginLibraryPlayback]);
 
   const pauseLibraryPlayback = useCallback(() => {
     const position = currentPlaybackPosition();
@@ -1166,6 +1213,7 @@ export default function Home() {
 
   const chooseLibrarySong = useCallback((songId: SongId) => {
     resetLibraryPlayback();
+    selectedSongIdRef.current = songId;
     setSelectedSongId(songId);
     const parsed = parsedSongsRef.current.get(songId);
     setTrackDuration(parsed?.duration ?? 0);
@@ -1178,6 +1226,14 @@ export default function Home() {
       : (currentIndex + direction + LIBRARY_SONGS.length) % LIBRARY_SONGS.length;
     chooseLibrarySong(LIBRARY_SONGS[nextIndex].id);
   }, [chooseLibrarySong, selectedSongId]);
+
+  const cyclePlaybackMode = useCallback(() => {
+    const nextMode = nextPlaybackMode(playbackModeRef.current);
+    playbackModeRef.current = nextMode;
+    setPlaybackMode(nextMode);
+    const currentLocale = localeRef.current;
+    setLastNote(`${UI_COPY[currentLocale].playbackMode} · ${playbackModeLabel(nextMode, currentLocale)}`);
+  }, []);
 
   const changePlaybackSpeed = useCallback((nextSpeed: number) => {
     const wasPlaying = playbackState === "playing";
@@ -1532,6 +1588,7 @@ export default function Home() {
   const selectedScene = SCENE_BY_ID.get(scene) ?? SCENE_OPTIONS[0];
   const selectedSong = SONG_BY_ID.get(selectedSongId) ?? LIBRARY_SONGS[0];
   const selectedSongTitle = librarySongTitle(selectedSong, locale, importedSongTitle);
+  const selectedPlaybackModeLabel = playbackModeLabel(playbackMode, locale);
   const selectedTimbreLabel = selectedTimbre.label[locale];
   const selectedSceneLabel = selectedScene.label[locale];
   const selectedSongReady = Boolean(selectedSong.midiUrl || (selectedSong.id === "local-import" && importedSongTitle));
@@ -1698,7 +1755,9 @@ export default function Home() {
               {playbackState === "loading" ? "…" : playbackState === "playing" ? "Ⅱ" : "▶"}
             </button>
             <button type="button" onClick={() => moveLibrarySong(1)} aria-label={copy.next}>›</button>
-            <button className={loopSong ? "active" : ""} type="button" aria-pressed={loopSong} onClick={() => setLoopSong((current) => { loopSongRef.current = !current; return !current; })} aria-label={copy.loop}>↻</button>
+            <button className="playback-mode-button" type="button" data-testid="playback-mode" onClick={cyclePlaybackMode} aria-label={`${copy.playbackMode}：${selectedPlaybackModeLabel}`} title={`${copy.playbackMode}：${selectedPlaybackModeLabel}`}>
+              <span aria-hidden="true">{PLAYBACK_MODE_ICONS[playbackMode]}</span><small>{selectedPlaybackModeLabel}</small>
+            </button>
           </div>
 
           <div className="speed-controls" aria-label={copy.speed}>
