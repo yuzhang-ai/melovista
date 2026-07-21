@@ -297,7 +297,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
 .sample-credit { margin-top: 11px; color: rgba(255, 255, 255, 0.42); font-size: 8px; }
 .sample-credit a { color: rgba(255, 243, 206, 0.72); text-underline-offset: 2px; }
 
-.library-drawer {
+.library-drawer, .practice-drawer {
   position: absolute;
   z-index: 41;
   top: 105px;
@@ -318,7 +318,53 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
   transition: opacity 160ms ease, transform 160ms ease, visibility 160ms;
   scrollbar-width: thin;
 }
-.library-drawer.open { opacity: 1; visibility: visible; transform: none; }
+.library-drawer.open, .practice-drawer.open { opacity: 1; visibility: visible; transform: none; }
+.practice-drawer { width: min(360px, calc(100% - 24px)); }
+.practice-heading { margin-bottom: 12px; }
+.practice-heading > div:first-child > span { max-width: 245px; margin-top: 2px; color: rgba(255, 255, 255, 0.5); font-size: 8px; line-height: 1.45; }
+.metronome-card, .loop-practice-card { position: relative; padding: 13px; border: 1px solid rgba(255, 255, 255, 0.11); border-radius: 15px; background: rgba(255, 255, 255, 0.045); }
+.metronome-card.running { border-color: rgba(236, 191, 91, 0.34); background: linear-gradient(145deg, rgba(236, 191, 91, 0.1), rgba(255, 255, 255, 0.035)); }
+.metronome-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.metronome-status > span { display: flex; flex-direction: column; gap: 3px; }
+.metronome-status > span small, .loop-practice-heading small { color: rgba(255, 255, 255, 0.46); font-size: 8px; }
+.metronome-status > span strong { color: #f8df9d; font: 650 18px/1.1 Georgia, "Times New Roman", serif; }
+.metronome-power { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 10px; color: #2d2417; font-size: 9px; border: 0; border-radius: 999px; background: #edc66d; box-shadow: 0 0 22px rgba(237, 198, 109, 0.2); cursor: pointer; }
+.metronome-power small { font-size: 7px; font-weight: 700; }
+.metronome-card.running .metronome-power { color: #fff5da; background: rgba(255, 255, 255, 0.1); box-shadow: none; }
+.beat-indicator { display: flex; justify-content: center; gap: 8px; margin: 14px 0 11px; }
+.beat-indicator i { display: grid; place-items: center; width: 27px; height: 27px; color: rgba(255, 255, 255, 0.38); font: normal 700 8px/1 var(--font-geist-mono), monospace; border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 50%; background: rgba(255, 255, 255, 0.035); transition: transform 70ms ease, color 70ms ease, background 70ms ease, box-shadow 70ms ease; }
+.beat-indicator i:first-child { border-color: rgba(237, 198, 109, 0.25); }
+.beat-indicator i.active { color: #2d2417; border-color: transparent; background: #edc66d; box-shadow: 0 0 20px rgba(237, 198, 109, 0.58); transform: scale(1.12); }
+.beat-indicator i:first-child.active { background: #fff0b8; box-shadow: 0 0 26px rgba(255, 230, 143, 0.75); }
+.tempo-control { padding-top: 9px; border-top: 1px solid rgba(255, 255, 255, 0.07); }
+.tempo-control > div:first-child { display: flex; align-items: center; justify-content: space-between; }
+.tempo-control label, .meter-control > span { color: rgba(255, 255, 255, 0.5); font-size: 8px; }
+.tempo-control > div:first-child > span { color: white; font: 700 10px/1 var(--font-geist-mono), monospace; }
+.tempo-control > div:first-child > span small { color: rgba(255, 255, 255, 0.38); font-size: 7px; }
+.tempo-control input { width: 100%; margin: 7px 0 5px; accent-color: #edc66d; }
+.tempo-presets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.tempo-presets button, .meter-control button { min-height: 25px; color: rgba(255, 255, 255, 0.48); font: 650 7px/1 var(--font-geist-mono), monospace; border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 8px; background: transparent; cursor: pointer; }
+.tempo-presets button.active, .meter-control button.active { color: #2d2417; border-color: transparent; background: #edc66d; }
+.meter-control { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 9px; }
+.meter-control > div { display: grid; grid-template-columns: repeat(4, 36px); gap: 4px; }
+.sync-tempo-button { width: 100%; min-height: 29px; margin-top: 10px; color: #f7dda2; font-size: 8px; border: 1px solid rgba(237, 198, 109, 0.2); border-radius: 9px; background: rgba(237, 198, 109, 0.07); cursor: pointer; }
+.accent-hint { display: block; margin-top: 7px; color: rgba(255, 255, 255, 0.34); font-size: 7px; text-align: center; }
+.accent-hint::first-letter { color: #edc66d; }
+.loop-practice-card { margin-top: 9px; }
+.loop-practice-card.active { border-color: rgba(152, 216, 193, 0.3); background: rgba(115, 190, 164, 0.07); }
+.loop-practice-heading { display: flex; align-items: center; justify-content: space-between; gap: 9px; }
+.loop-practice-heading > span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.loop-practice-heading strong { color: rgba(255, 255, 255, 0.78); font-size: 9px; }
+.loop-practice-heading > button { padding: 6px 8px; color: #d9fff0; font-size: 7px; border: 1px solid rgba(152, 216, 193, 0.22); border-radius: 999px; background: rgba(152, 216, 193, 0.08); cursor: pointer; }
+.loop-practice-heading > button:disabled { opacity: 0.32; cursor: not-allowed; }
+.loop-points { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin-top: 11px; }
+.loop-points > button { display: grid; grid-template-columns: auto 1fr; gap: 3px 7px; align-items: center; padding: 8px; color: white; text-align: left; border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 10px; background: rgba(255, 255, 255, 0.035); cursor: pointer; }
+.loop-points > button > small { grid-row: 1 / span 2; display: grid; place-items: center; width: 25px; height: 25px; color: #193b30; font: 800 10px/1 var(--font-geist-mono), monospace; border-radius: 8px; background: #98d8c1; }
+.loop-points > button > strong { font: 700 9px/1 var(--font-geist-mono), monospace; }
+.loop-points > button > span { color: rgba(255, 255, 255, 0.38); font-size: 7px; }
+.loop-points > i { color: rgba(255, 255, 255, 0.28); font-style: normal; }
+.clear-loop-button { display: block; margin: 8px auto 0; padding: 4px 8px; color: rgba(255, 255, 255, 0.38); font-size: 7px; border: 0; background: transparent; cursor: pointer; }
+.clear-loop-button:disabled { opacity: 0.28; cursor: default; }
 .library-heading { margin-bottom: 11px; }
 .library-heading > div:first-child > span { max-width: 245px; margin-top: 2px; color: rgba(255, 255, 255, 0.5); font-size: 8px; line-height: 1.45; }
 .drawer-actions { flex-direction: row !important; }
@@ -599,7 +645,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
   .control-dock { justify-content: flex-start; flex-wrap: wrap; max-width: calc(100vw - 28px); overflow: visible; border-radius: 18px; }
   .dock-item, .dock-button { flex: none; }
   .performance-drawer { top: 154px; right: 12px; }
-  .library-drawer { top: 154px; right: 12px; max-height: calc(100svh - 365px); }
+  .library-drawer, .practice-drawer { top: 154px; right: 12px; max-height: calc(100svh - 365px); }
   .performance-pill { right: 16px; bottom: 240px; min-width: 300px; }
   .performance-pill > div { min-width: 68px; }
   .performance-pill .current-note { display: none; }

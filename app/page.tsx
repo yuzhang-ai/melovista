@@ -22,6 +22,7 @@ type SampleBankKey = Exclude<Timbre, "bright">;
 type AudioStatus = "idle" | "starting" | "loading" | "running" | "suspended" | "error";
 type PlaybackState = "idle" | "loading" | "playing" | "paused";
 type PlaybackMode = "sequential" | "repeat-one" | "shuffle";
+type BeatCount = 2 | 3 | 4 | 6;
 
 type Voice = {
   source: AudioBufferSourceNode;
@@ -56,6 +57,7 @@ type ParsedSong = {
   duration: number;
   bpm: number | null;
   trackCount: number;
+  beatCount: BeatCount | null;
 };
 
 type LibrarySong = {
@@ -219,6 +221,29 @@ const UI_COPY = {
     exitImmersive: "退出沉浸",
     more: "更多",
     performance: "性能信息",
+    practice: "练习",
+    metronome: "节拍器",
+    practiceStudio: "节奏练习",
+    practiceIntro: "稳定节拍，并用 A–B 循环反复练习难点",
+    closePractice: "关闭练习面板",
+    startMetronome: "启动节拍器",
+    stopMetronome: "停止节拍器",
+    tempo: "速度",
+    timeSignature: "拍号",
+    beatsPerMinute: "每分钟拍数",
+    accentBeat: "每小节第一拍重音",
+    syncSongTempo: "跟随当前曲目",
+    songTempoUnavailable: "当前曲目尚未读取到速度",
+    metronomeSynced: "节拍器已同步当前曲目",
+    loopPractice: "A–B 片段循环",
+    setLoopA: "设为 A 点",
+    setLoopB: "设为 B 点",
+    clearLoop: "清除循环",
+    enableLoop: "启用 A–B 循环",
+    disableLoop: "关闭 A–B 循环",
+    loopNeedsSong: "先选择并加载一首曲目",
+    loopReady: "A–B 循环已就绪",
+    currentPosition: "当前播放位置",
     library: "曲库",
     appreciation: "欣赏模式",
     songLibrary: "钢琴曲库",
@@ -312,6 +337,29 @@ const UI_COPY = {
     exitImmersive: "Exit immersive",
     more: "More",
     performance: "Performance",
+    practice: "Practice",
+    metronome: "Metronome",
+    practiceStudio: "Rhythm practice",
+    practiceIntro: "Keep a steady pulse and repeat difficult sections with an A–B loop",
+    closePractice: "Close practice panel",
+    startMetronome: "Start metronome",
+    stopMetronome: "Stop metronome",
+    tempo: "Tempo",
+    timeSignature: "Meter",
+    beatsPerMinute: "beats per minute",
+    accentBeat: "Accent the first beat of each bar",
+    syncSongTempo: "Use current song tempo",
+    songTempoUnavailable: "No tempo has been read from the current song yet",
+    metronomeSynced: "Metronome synced to the current song",
+    loopPractice: "A–B section loop",
+    setLoopA: "Set point A",
+    setLoopB: "Set point B",
+    clearLoop: "Clear loop",
+    enableLoop: "Enable A–B loop",
+    disableLoop: "Disable A–B loop",
+    loopNeedsSong: "Choose and load a song first",
+    loopReady: "A–B loop is ready",
+    currentPosition: "Current playback position",
     library: "Library",
     appreciation: "Listen",
     songLibrary: "Piano Library",
@@ -535,11 +583,19 @@ async function parseMidiBuffer(buffer: ArrayBuffer): Promise<ParsedSong> {
       velocity: Math.max(0.12, note.velocity),
     })))
     .sort((a, b) => a.startSeconds - b.startSeconds || a.midi - b.midi);
+  const primaryTimeSignature = midi.header.timeSignatures
+    .map((signature, index, signatures) => ({
+      beatCount: signature.timeSignature[0],
+      span: Math.max(0, (signatures[index + 1]?.ticks ?? midi.durationTicks) - signature.ticks),
+    }))
+    .filter((signature) => [2, 3, 4, 6].includes(signature.beatCount))
+    .sort((a, b) => b.span - a.span)[0];
   return {
     notes,
     duration: Math.max(midi.duration, notes.at(-1)?.startSeconds ?? 0),
     bpm: midi.header.tempos[0]?.bpm ?? null,
     trackCount: midi.tracks.filter((track) => track.notes.length > 0).length,
+    beatCount: primaryTimeSignature ? primaryTimeSignature.beatCount as BeatCount : null,
   };
 }
 
@@ -684,10 +740,16 @@ export default function Home() {
   const autoMidiCountsRef = useRef(new Map<number, number>());
   const autoVisualTimersRef = useRef<number[]>([]);
   const autoSchedulerRef = useRef<number | null>(null);
+  const metronomeSchedulerRef = useRef<number | null>(null);
+  const metronomeVisualTimersRef = useRef<number[]>([]);
+  const metronomeClockRef = useRef({ nextBeatTime: 0, beatIndex: 0 });
+  const metronomeTempoRef = useRef(80);
+  const metronomeBeatCountRef = useRef<BeatCount>(4);
   const parsedSongsRef = useRef(new Map<SongId, ParsedSong>());
   const localLibrarySongsRef = useRef<LocalLibrarySong[]>([]);
   const playbackRef = useRef({ notes: [] as SongNote[], nextIndex: 0, offset: 0, startedAt: 0, duration: 0, speed: 1 });
   const playbackModeRef = useRef<PlaybackMode>("sequential");
+  const practiceLoopRef = useRef({ enabled: false, a: 0, b: 0 });
   const selectedSongIdRef = useRef<SongId>("fur-elise");
   const beginLibraryPlaybackRef = useRef<((offset?: number, speedOverride?: number, songIdOverride?: SongId) => Promise<void>) | null>(null);
   const activeCodesRef = useRef(new Set<string>());
@@ -728,12 +790,18 @@ export default function Home() {
   const [immersiveMode, setImmersiveMode] = useState(false);
   const [showPerformance, setShowPerformance] = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [showPractice, setShowPractice] = useState(false);
   const [selectedSongId, setSelectedSongId] = useState<SongId>("fur-elise");
   const [playbackState, setPlaybackState] = useState<PlaybackState>("idle");
   const [playbackSeconds, setPlaybackSeconds] = useState(0);
   const [trackDuration, setTrackDuration] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>("sequential");
+  const [metronomeEnabled, setMetronomeEnabled] = useState(false);
+  const [metronomeTempo, setMetronomeTempo] = useState(80);
+  const [metronomeBeatCount, setMetronomeBeatCount] = useState<BeatCount>(4);
+  const [metronomeBeat, setMetronomeBeat] = useState(-1);
+  const [practiceLoop, setPracticeLoop] = useState({ enabled: false, a: 0, b: 0 });
   const [autoMidis, setAutoMidis] = useState<Set<number>>(new Set());
   const [pointerMidis, setPointerMidis] = useState<Set<number>>(new Set());
   const [localLibrarySongs, setLocalLibrarySongs] = useState<LocalLibrarySong[]>([]);
@@ -1054,6 +1122,77 @@ export default function Home() {
     if (ambientEnabledRef.current) void playAmbientScene(sceneRef.current);
   }, [ensureSampleBank, playAmbientScene]);
 
+  const stopMetronome = useCallback(() => {
+    if (metronomeSchedulerRef.current !== null) {
+      window.clearInterval(metronomeSchedulerRef.current);
+      metronomeSchedulerRef.current = null;
+    }
+    metronomeVisualTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    metronomeVisualTimersRef.current = [];
+    setMetronomeEnabled(false);
+    setMetronomeBeat(-1);
+  }, []);
+
+  const scheduleMetronomeClick = useCallback((beatIndex: number, when: number) => {
+    const context = audioContextRef.current;
+    if (!context || context.state !== "running") return;
+    const accent = beatIndex === 0;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = accent ? "triangle" : "sine";
+    oscillator.frequency.setValueAtTime(accent ? 1320 : 880, when);
+    gain.gain.setValueAtTime(0.0001, when);
+    gain.gain.exponentialRampToValueAtTime(accent ? 0.14 : 0.075, when + 0.002);
+    gain.gain.exponentialRampToValueAtTime(0.0001, when + (accent ? 0.065 : 0.045));
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start(when);
+    oscillator.stop(when + 0.08);
+
+    const timer = window.setTimeout(() => setMetronomeBeat(beatIndex), Math.max(0, (when - context.currentTime) * 1000));
+    metronomeVisualTimersRef.current.push(timer);
+    if (metronomeVisualTimersRef.current.length > 32) metronomeVisualTimersRef.current.splice(0, 16);
+  }, []);
+
+  const startMetronome = useCallback(async () => {
+    await initializeAudio();
+    const context = audioContextRef.current;
+    if (!context || context.state !== "running") return;
+    if (metronomeSchedulerRef.current !== null) window.clearInterval(metronomeSchedulerRef.current);
+    metronomeClockRef.current = { nextBeatTime: context.currentTime + 0.06, beatIndex: 0 };
+    setMetronomeEnabled(true);
+    const tick = () => {
+      const liveContext = audioContextRef.current;
+      if (!liveContext || liveContext.state !== "running") return;
+      const clock = metronomeClockRef.current;
+      while (clock.nextBeatTime < liveContext.currentTime + 0.1) {
+        scheduleMetronomeClick(clock.beatIndex, clock.nextBeatTime);
+        clock.nextBeatTime += 60 / metronomeTempoRef.current;
+        clock.beatIndex = (clock.beatIndex + 1) % metronomeBeatCountRef.current;
+      }
+    };
+    metronomeSchedulerRef.current = window.setInterval(tick, 25);
+    tick();
+  }, [initializeAudio, scheduleMetronomeClick]);
+
+  const toggleMetronome = useCallback(() => {
+    if (metronomeSchedulerRef.current !== null) stopMetronome();
+    else void startMetronome();
+  }, [startMetronome, stopMetronome]);
+
+  const changeMetronomeTempo = useCallback((tempo: number) => {
+    const safeTempo = Math.min(208, Math.max(40, Math.round(tempo)));
+    metronomeTempoRef.current = safeTempo;
+    setMetronomeTempo(safeTempo);
+  }, []);
+
+  const changeMetronomeBeatCount = useCallback((beatCount: BeatCount) => {
+    metronomeBeatCountRef.current = beatCount;
+    metronomeClockRef.current.beatIndex = 0;
+    setMetronomeBeatCount(beatCount);
+    setMetronomeBeat(-1);
+  }, []);
+
   const toggleAmbientAudio = useCallback(async () => {
     const enabled = !ambientEnabledRef.current;
     if (enabled && !audioContextRef.current) {
@@ -1239,13 +1378,28 @@ export default function Home() {
       const playback = playbackRef.current;
       const position = Math.min(playback.duration, playback.offset + (liveContext.currentTime - playback.startedAt) * playback.speed);
       setPlaybackSeconds(position);
-      const songHorizon = position + 0.16 * playback.speed;
+      const loop = practiceLoopRef.current;
+      const hasActiveLoop = loop.enabled && loop.b > loop.a && loop.b <= playback.duration;
+      const songHorizon = Math.min(hasActiveLoop ? loop.b : playback.duration, position + 0.16 * playback.speed);
       while (playback.nextIndex < playback.notes.length && playback.notes[playback.nextIndex].startSeconds <= songHorizon) {
         const noteIndex = playback.nextIndex;
         const note = playback.notes[noteIndex];
         const audioWhen = liveContext.currentTime + Math.max(0, (note.startSeconds - position) / playback.speed);
         scheduleAutoNote(note, audioWhen, playback.speed, `${song.id}:${noteIndex}:${playback.startedAt}`);
         playback.nextIndex += 1;
+      }
+      if (hasActiveLoop && position >= loop.b) {
+        stopAutoScheduler();
+        stopAutoSources();
+        playback.offset = loop.a;
+        playback.startedAt = 0;
+        playback.nextIndex = 0;
+        setPlaybackSeconds(loop.a);
+        setPlaybackState("loading");
+        window.setTimeout(() => {
+          void beginLibraryPlaybackRef.current?.(loop.a, playback.speed, song.id);
+        }, 70);
+        return;
       }
       if (position >= playback.duration) {
         const mode = playbackModeRef.current;
@@ -1264,6 +1418,8 @@ export default function Home() {
           playback.nextIndex = 0;
           selectedSongIdRef.current = nextSongId;
           setSelectedSongId(nextSongId);
+          practiceLoopRef.current = { enabled: false, a: 0, b: 0 };
+          setPracticeLoop({ enabled: false, a: 0, b: 0 });
           setTrackDuration(parsedSongsRef.current.get(nextSongId)?.duration ?? 0);
           setPlaybackSeconds(0);
           setPlaybackState("loading");
@@ -1306,6 +1462,8 @@ export default function Home() {
 
   const chooseLibrarySong = useCallback((songId: SongId) => {
     resetLibraryPlayback();
+    practiceLoopRef.current = { enabled: false, a: 0, b: 0 };
+    setPracticeLoop({ enabled: false, a: 0, b: 0 });
     selectedSongIdRef.current = songId;
     setSelectedSongId(songId);
     const parsed = parsedSongsRef.current.get(songId);
@@ -1406,6 +1564,8 @@ export default function Home() {
     if (importedSongs.length) {
       const firstSong = importedSongs[0];
       resetLibraryPlayback();
+      practiceLoopRef.current = { enabled: false, a: 0, b: 0 };
+      setPracticeLoop({ enabled: false, a: 0, b: 0 });
       selectedSongIdRef.current = firstSong.id;
       setSelectedSongId(firstSong.id);
       setTrackDuration(firstSong.duration);
@@ -1425,6 +1585,71 @@ export default function Home() {
     setImportSummary("");
     if (isLocalSongId(selectedSongIdRef.current)) chooseLibrarySong("fur-elise");
   }, [chooseLibrarySong]);
+
+  const applyPracticeLoop = useCallback((next: { enabled: boolean; a: number; b: number }) => {
+    practiceLoopRef.current = next;
+    setPracticeLoop(next);
+  }, []);
+
+  const setPracticeLoopA = useCallback(() => {
+    const copy = UI_COPY[localeRef.current];
+    if (!trackDuration) {
+      setLastNote(copy.loopNeedsSong);
+      return;
+    }
+    const a = Math.min(playbackSeconds, Math.max(0, trackDuration - 0.5));
+    const b = practiceLoop.b > a + 0.25 ? practiceLoop.b : Math.min(trackDuration, a + 4);
+    applyPracticeLoop({ enabled: b > a, a, b });
+    setLastNote(`${copy.loopReady} · A ${formatPlaybackTime(a)} / B ${formatPlaybackTime(b)}`);
+  }, [applyPracticeLoop, playbackSeconds, practiceLoop.b, trackDuration]);
+
+  const setPracticeLoopB = useCallback(() => {
+    const copy = UI_COPY[localeRef.current];
+    if (!trackDuration) {
+      setLastNote(copy.loopNeedsSong);
+      return;
+    }
+    const minimumB = practiceLoop.a + 0.5;
+    const b = Math.min(trackDuration, Math.max(playbackSeconds, minimumB));
+    if (b <= practiceLoop.a) {
+      setLastNote(copy.loopNeedsSong);
+      return;
+    }
+    applyPracticeLoop({ enabled: true, a: practiceLoop.a, b });
+    setLastNote(`${copy.loopReady} · A ${formatPlaybackTime(practiceLoop.a)} / B ${formatPlaybackTime(b)}`);
+  }, [applyPracticeLoop, playbackSeconds, practiceLoop.a, trackDuration]);
+
+  const clearPracticeLoop = useCallback(() => {
+    applyPracticeLoop({ enabled: false, a: 0, b: 0 });
+  }, [applyPracticeLoop]);
+
+  const togglePracticeLoop = useCallback(() => {
+    const copy = UI_COPY[localeRef.current];
+    if (practiceLoop.b <= practiceLoop.a || !trackDuration) {
+      setLastNote(copy.loopNeedsSong);
+      return;
+    }
+    applyPracticeLoop({ ...practiceLoop, enabled: !practiceLoop.enabled });
+  }, [applyPracticeLoop, practiceLoop, trackDuration]);
+
+  const syncMetronomeToSong = useCallback(async () => {
+    const copy = UI_COPY[localeRef.current];
+    const song = findLibrarySong(selectedSongIdRef.current);
+    let parsed: ParsedSong | null = null;
+    try {
+      parsed = await loadLibrarySong(song);
+    } catch {
+      // The regular player will surface detailed MIDI errors when playback is requested.
+    }
+    if (!parsed?.bpm) {
+      setLastNote(copy.songTempoUnavailable);
+      return;
+    }
+    changeMetronomeTempo(parsed.bpm);
+    if (parsed.beatCount) changeMetronomeBeatCount(parsed.beatCount);
+    setTrackDuration(parsed.duration);
+    setLastNote(`${copy.metronomeSynced} · ${Math.round(parsed.bpm)} BPM`);
+  }, [changeMetronomeBeatCount, changeMetronomeTempo, findLibrarySong, loadLibrarySong]);
 
   const markPointerMidiActive = useCallback((midi: number, active: boolean) => {
     const currentCount = pointerMidiCountsRef.current.get(midi) ?? 0;
@@ -1680,7 +1905,8 @@ export default function Home() {
       }
     });
     fadeOutAmbientVoice(0.04);
-  }, [fadeOutAmbientVoice]);
+    stopMetronome();
+  }, [fadeOutAmbientVoice, stopMetronome]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1766,7 +1992,10 @@ export default function Home() {
     };
 
     const onVisibilityChange = () => {
-      if (document.hidden) releaseAll(0.08);
+      if (document.hidden) {
+        releaseAll(0.08);
+        stopMetronome();
+      }
     };
     const onBlur = () => releaseAll(0.08);
     const onFullscreenChange = () => {
@@ -1797,7 +2026,7 @@ export default function Home() {
       (navigator as KeyboardLockNavigator).keyboard?.unlock?.();
       releaseAll(0.05);
     };
-  }, [releaseAll, releaseVoice, startVoice, toggleArticulation]);
+  }, [releaseAll, releaseVoice, startVoice, stopMetronome, toggleArticulation]);
 
   const activeCodeSet = useMemo(() => activeCodes, [activeCodes]);
   const filteredLocalSongs = useMemo(() => {
@@ -1903,9 +2132,13 @@ export default function Home() {
             <span className="dock-icon" aria-hidden="true">◎</span>
             <span><small>{copy.mode}</small><b>{immersiveMode ? copy.exitImmersive : copy.enterImmersive}</b></span>
           </button>
-          <button className={`dock-button ${showLibrary ? "active" : ""}`} type="button" aria-pressed={showLibrary} onClick={() => { setShowPerformance(false); setShowLibrary((value) => !value); }} data-testid="library-toggle">
+          <button className={`dock-button ${showLibrary ? "active" : ""}`} type="button" aria-pressed={showLibrary} onClick={() => { setShowPerformance(false); setShowPractice(false); setShowLibrary((value) => !value); }} data-testid="library-toggle">
             <span className="dock-icon" aria-hidden="true">♫</span>
             <span><small>{copy.library}</small><b>{copy.appreciation}</b></span>
+          </button>
+          <button className={`dock-button ${showPractice ? "active" : ""}`} type="button" aria-pressed={showPractice} onClick={() => { setShowPerformance(false); setShowLibrary(false); setShowPractice((value) => !value); }} data-testid="practice-toggle">
+            <span className="dock-icon" aria-hidden="true">♩</span>
+            <span><small>{copy.practice}</small><b>{copy.metronome}</b></span>
           </button>
           <button className="dock-button language-button" type="button" aria-label={copy.switchLanguage} onClick={() => changeLocale(locale === "zh" ? "en" : "zh")} data-testid="language-toggle">
             <span className="dock-icon language-icon" aria-hidden="true">文</span>
@@ -1925,6 +2158,48 @@ export default function Home() {
           </button>
         </div>
       </header>
+
+      <aside className={`practice-drawer ${showPractice ? "open" : ""}`} aria-hidden={!showPractice}>
+        <div className="drawer-heading practice-heading">
+          <div><small>RHYTHM STUDIO</small><strong>{copy.practiceStudio}</strong><span>{copy.practiceIntro}</span></div>
+          <button type="button" onClick={() => setShowPractice(false)} aria-label={copy.closePractice}>×</button>
+        </div>
+
+        <section className={`metronome-card ${metronomeEnabled ? "running" : ""}`}>
+          <div className="metronome-status">
+            <span><small>{copy.metronome}</small><strong>{metronomeTempo} BPM</strong></span>
+            <button type="button" className="metronome-power" aria-pressed={metronomeEnabled} onClick={toggleMetronome} data-testid="metronome-toggle">
+              {metronomeEnabled ? "■" : "▶"}<small>{metronomeEnabled ? copy.stopMetronome : copy.startMetronome}</small>
+            </button>
+          </div>
+          <div className="beat-indicator" aria-label={`${metronomeBeatCount}/4`}>
+            {Array.from({ length: metronomeBeatCount }, (_, index) => <i className={metronomeBeat === index ? "active" : ""} key={index}>{index + 1}</i>)}
+          </div>
+          <div className="tempo-control">
+            <div><label htmlFor="metronome-tempo">{copy.tempo}</label><span>{metronomeTempo} <small>BPM</small></span></div>
+            <input id="metronome-tempo" type="range" min="40" max="208" step="1" value={metronomeTempo} aria-label={copy.beatsPerMinute} onChange={(event) => changeMetronomeTempo(Number(event.target.value))} />
+            <div className="tempo-presets">
+              {[60, 80, 100, 120, 160].map((tempo) => <button className={metronomeTempo === tempo ? "active" : ""} type="button" key={tempo} onClick={() => changeMetronomeTempo(tempo)}>{tempo}</button>)}
+            </div>
+          </div>
+          <div className="meter-control">
+            <span>{copy.timeSignature}</span>
+            <div>{([2, 3, 4, 6] as BeatCount[]).map((beats) => <button className={metronomeBeatCount === beats ? "active" : ""} type="button" key={beats} onClick={() => changeMetronomeBeatCount(beats)}>{beats}/4</button>)}</div>
+          </div>
+          <button className="sync-tempo-button" type="button" onClick={() => { void syncMetronomeToSong(); }}>↻ {copy.syncSongTempo}</button>
+          <small className="accent-hint">● {copy.accentBeat}</small>
+        </section>
+
+        <section className={`loop-practice-card ${practiceLoop.enabled ? "active" : ""}`}>
+          <div className="loop-practice-heading"><span><small>{copy.loopPractice}</small><strong>{copy.currentPosition} · {formatPlaybackTime(playbackSeconds)}</strong></span><button type="button" disabled={practiceLoop.b <= practiceLoop.a} aria-pressed={practiceLoop.enabled} onClick={togglePracticeLoop}>{practiceLoop.enabled ? copy.disableLoop : copy.enableLoop}</button></div>
+          <div className="loop-points">
+            <button type="button" onClick={setPracticeLoopA}><small>A</small><strong>{formatPlaybackTime(practiceLoop.a)}</strong><span>{copy.setLoopA}</span></button>
+            <i aria-hidden="true">→</i>
+            <button type="button" onClick={setPracticeLoopB}><small>B</small><strong>{practiceLoop.b ? formatPlaybackTime(practiceLoop.b) : "—:—"}</strong><span>{copy.setLoopB}</span></button>
+          </div>
+          <button className="clear-loop-button" type="button" disabled={!practiceLoop.a && !practiceLoop.b} onClick={clearPracticeLoop}>{copy.clearLoop}</button>
+        </section>
+      </aside>
 
       <aside className={`library-drawer ${showLibrary ? "open" : ""}`} aria-hidden={!showLibrary}>
         <div className="drawer-heading library-heading">

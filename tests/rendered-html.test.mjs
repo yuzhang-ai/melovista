@@ -80,6 +80,11 @@ test("server-renders the immersive six-range piano", async () => {
   assert.match(html, /data-midi="95"/);
   assert.match(html, /data-testid="playback-mode"/);
   assert.match(html, /aria-label="播放模式：顺序播放"/);
+  assert.match(html, /data-testid="practice-toggle"/);
+  assert.match(html, /节奏练习/);
+  assert.match(html, /data-testid="metronome-toggle"/);
+  assert.match(html, /id="metronome-tempo"/);
+  assert.match(html, /A–B 片段循环/);
   assert.doesNotMatch(html, /你离开的事实|Call of Silence/);
   assert.match(html, /LEFT ALT/);
   assert.match(html, /data-testid="articulation-mode">短音/);
@@ -150,7 +155,7 @@ test("appreciation mode schedules four built-in pieces and a local-only folder l
   assert.match(source, /midiUrl: "\/midi\/dandelions-promise\.mid"/);
   assert.match(source, /midiUrl: "\/midi\/flower-sea\.mid"/);
   assert.match(source, /setInterval\(tick, 25\)/);
-  assert.match(source, /const songHorizon = position \+ 0\.16 \* playback\.speed/);
+  assert.match(source, /const songHorizon = Math\.min\([\s\S]*position \+ 0\.16 \* playback\.speed\)/);
   assert.match(source, /source\.start\(startAt\)/);
   assert.match(source, /spawnMidiNoteLight\(note\.midi, true\)/);
   assert.match(source, /file\.arrayBuffer\(\)/);
@@ -288,6 +293,27 @@ test("pointer piano supports mouse, glide and multi-touch across all visible oct
   assert.match(source, /onPointerCancel=\{handlePianoPointerEnd\}/);
   assert.match(source, /data-midi=\{midi\}/);
   assert.match(styles, /\.piano-key \{[^}]*touch-action: none/);
+});
+
+test("practice mode uses Web Audio lookahead scheduling and an audio-clock A-B loop", async () => {
+  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(source, /type BeatCount = 2 \| 3 \| 4 \| 6/);
+  assert.match(source, /const scheduleMetronomeClick/);
+  assert.match(source, /oscillator\.frequency\.setValueAtTime\(accent \? 1320 : 880, when\)/);
+  assert.match(source, /liveContext\.currentTime \+ 0\.1/);
+  assert.match(source, /clock\.nextBeatTime \+= 60 \/ metronomeTempoRef\.current/);
+  assert.match(source, /metronomeSchedulerRef\.current = window\.setInterval\(tick, 25\)/);
+  assert.match(source, /midi\.header\.tempos\[0\]\?\.bpm/);
+  assert.match(source, /midi\.header\.timeSignatures/);
+  assert.match(source, /signatures\[index \+ 1\]\?\.ticks \?\? midi\.durationTicks/);
+  assert.match(source, /const hasActiveLoop = loop\.enabled && loop\.b > loop\.a/);
+  assert.match(source, /Math\.min\(hasActiveLoop \? loop\.b : playback\.duration/);
+  assert.match(source, /beginLibraryPlaybackRef\.current\?\.\(loop\.a, playback\.speed, song\.id\)/);
+  assert.match(source, /if \(document\.hidden\)[\s\S]*stopMetronome\(\)/);
+  assert.match(styles, /\.practice-drawer/);
+  assert.match(styles, /\.beat-indicator i\.active/);
+  assert.match(styles, /\.loop-practice-card\.active/);
 });
 
 test("all note particles share the scene's full rise height", async () => {
