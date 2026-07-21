@@ -153,7 +153,7 @@ test("appreciation mode schedules four built-in pieces and a local-only folder l
   assert.match(source, /midiUrl: "\/midi\/fur-elise\.mid"/);
   assert.match(source, /midiUrl: "\/midi\/merry-christmas-mr-lawrence\.mid"/);
   assert.match(source, /midiUrl: "\/midi\/dandelions-promise\.mid"/);
-  assert.match(source, /midiUrl: "\/midi\/flower-sea\.mid"/);
+  assert.match(source, /midiUrl: "\/midi\/flower-sea\.mid\?v=2d448931"/);
   assert.match(source, /setInterval\(tick, 25\)/);
   assert.match(source, /const songHorizon = Math\.min\([\s\S]*position \+ 0\.16 \* playback\.speed\)/);
   assert.match(source, /source\.start\(startAt\)/);

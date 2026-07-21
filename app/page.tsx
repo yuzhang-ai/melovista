@@ -512,7 +512,8 @@ const LIBRARY_SONGS: LibrarySong[] = [
     title: { zh: "花海", en: "Flower Sea" },
     composer: { zh: "周杰伦", en: "Jay Chou" },
     color: "#e7a9c4",
-    midiUrl: "/midi/flower-sea.mid",
+    // Keep the content hash in the URL so browsers cannot reuse the older OMR export.
+    midiUrl: "/midi/flower-sea.mid?v=2d448931",
   },
   {
     id: "fur-elise",
