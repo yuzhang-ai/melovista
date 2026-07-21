@@ -1,0 +1,99 @@
+{
+  "score": {
+    "path": "D:\\Users\\Desktop\\zhangyu\\乐境\\outputs\\枫-midi\\枫-自动识谱.musicxml",
+    "parts": [
+      {
+        "id": "P1-Staff1",
+        "name": "Piano",
+        "measures": 59,
+        "note_objects": 462,
+        "highest_quarter": 236.5
+      },
+      {
+        "id": "P1-Staff2",
+        "name": "Piano",
+        "measures": 59,
+        "note_objects": 359,
+        "highest_quarter": 236.5
+      }
+    ],
+    "keys_fifths": [
+      4,
+      7
+    ],
+    "times": [
+      "2/4",
+      "4/4"
+    ]
+  },
+  "midi": {
+    "path": "D:\\Users\\Desktop\\zhangyu\\乐境\\outputs\\枫-midi\\枫-钢琴双轨-识谱版.mid",
+    "header": "MThd",
+    "bytes": 8925,
+    "type": 1,
+    "ticks_per_beat": 10080,
+    "duration_seconds": 216.923,
+    "tracks": [
+      {
+        "index": 0,
+        "name": "Conductor",
+        "note_ons": 0,
+        "messages": 11
+      },
+      {
+        "index": 1,
+        "name": "Piano - Right Hand",
+        "note_ons": 503,
+        "messages": 1011
+      },
+      {
+        "index": 2,
+        "name": "Piano - Left Hand",
+        "note_ons": 569,
+        "messages": 1143
+      }
+    ],
+    "tempos": [
+      {
+        "tick": 0,
+        "bpm": 65.0
+      }
+    ],
+    "keys": [
+      {
+        "tick": 1955520,
+        "key": "C#"
+      },
+      {
+        "tick": 2036160,
+        "key": "C#"
+      },
+      {
+        "tick": 2036160,
+        "key": "C#"
+      }
+    ],
+    "times": [
+      {
+        "tick": 0,
+        "signature": "4/4"
+      },
+      {
+        "tick": 120960,
+        "signature": "2/4"
+      },
+      {
+        "tick": 120960,
+        "signature": "2/4"
+      },
+      {
+        "tick": 141120,
+        "signature": "4/4"
+      },
+      {
+        "tick": 141120,
+        "signature": "4/4"
+      }
+    ]
+  }
+}

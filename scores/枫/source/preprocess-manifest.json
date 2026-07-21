@@ -1,0 +1,56 @@
+[
+  {
+    "source": "D:\\Users\\Documents\\xwechat_files\\wxid_dcgmbin27pvs22_e242\\temp\\RWTemp\\2026-07\\9e20f478899dc29eb19741386f9343c8\\a7a92d7b476ee6286d2ed0aee7cfeef0.jpg",
+    "original_size": [
+      1080,
+      1448
+    ],
+    "crop": [
+      0,
+      0,
+      1080,
+      1447
+    ],
+    "processed_size": [
+      2360,
+      3094
+    ],
+    "output": "D:\\Users\\Desktop\\zhangyu\\乐境\\outputs\\枫-midi\\source\\page-1.png"
+  },
+  {
+    "source": "D:\\Users\\Documents\\xwechat_files\\wxid_dcgmbin27pvs22_e242\\temp\\RWTemp\\2026-07\\9e20f478899dc29eb19741386f9343c8\\0971a5f45f985677c15d0dd2072a46d2.jpg",
+    "original_size": [
+      1080,
+      1510
+    ],
+    "crop": [
+      0,
+      0,
+      1080,
+      1510
+    ],
+    "processed_size": [
+      2360,
+      3220
+    ],
+    "output": "D:\\Users\\Desktop\\zhangyu\\乐境\\outputs\\枫-midi\\source\\page-2.png"
+  },
+  {
+    "source": "D:\\Users\\Documents\\xwechat_files\\wxid_dcgmbin27pvs22_e242\\temp\\RWTemp\\2026-07\\9e20f478899dc29eb19741386f9343c8\\bd014acef990dec9e51d7ef725187881.jpg",
+    "original_size": [
+      1080,
+      1570
+    ],
+    "crop": [
+      0,
+      0,
+      1080,
+      1570
+    ],
+    "processed_size": [
+      2360,
+      3340
+    ],
+    "output": "D:\\Users\\Desktop\\zhangyu\\乐境\\outputs\\枫-midi\\source\\page-3.png"
+  }
+]

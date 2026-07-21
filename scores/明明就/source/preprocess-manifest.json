@@ -1,0 +1,74 @@
+[
+  {
+    "source": "D:\\Users\\Documents\\xwechat_files\\wxid_dcgmbin27pvs22_e242\\temp\\RWTemp\\2026-07\\9e20f478899dc29eb19741386f9343c8\\0df315d46557561f1f8ff4e77cf90332.jpg",
+    "original_size": [
+      1280,
+      1706
+    ],
+    "crop": [
+      0,
+      0,
+      1280,
+      1706
+    ],
+    "processed_size": [
+      2760,
+      3612
+    ],
+    "output": "D:\\Users\\Desktop\\zhangyu\\乐境\\outputs\\明明就-midi\\source\\page-1.png"
+  },
+  {
+    "source": "D:\\Users\\Documents\\xwechat_files\\wxid_dcgmbin27pvs22_e242\\temp\\RWTemp\\2026-07\\9e20f478899dc29eb19741386f9343c8\\9364545855f1a50336b686ac386f9d22.jpg",
+    "original_size": [
+      1280,
+      1706
+    ],
+    "crop": [
+      0,
+      0,
+      1280,
+      1706
+    ],
+    "processed_size": [
+      2760,
+      3612
+    ],
+    "output": "D:\\Users\\Desktop\\zhangyu\\乐境\\outputs\\明明就-midi\\source\\page-2.png"
+  },
+  {
+    "source": "D:\\Users\\Documents\\xwechat_files\\wxid_dcgmbin27pvs22_e242\\temp\\RWTemp\\2026-07\\9e20f478899dc29eb19741386f9343c8\\f1f983d39f0b586f294965f56944809c.jpg",
+    "original_size": [
+      1280,
+      1706
+    ],
+    "crop": [
+      0,
+      0,
+      1280,
+      1706
+    ],
+    "processed_size": [
+      2760,
+      3612
+    ],
+    "output": "D:\\Users\\Desktop\\zhangyu\\乐境\\outputs\\明明就-midi\\source\\page-3.png"
+  },
+  {
+    "source": "D:\\Users\\Documents\\xwechat_files\\wxid_dcgmbin27pvs22_e242\\temp\\RWTemp\\2026-07\\9e20f478899dc29eb19741386f9343c8\\a760188e9da00315232c0990f1d7dfdd.jpg",
+    "original_size": [
+      1280,
+      1706
+    ],
+    "crop": [
+      0,
+      0,
+      1280,
+      1706
+    ],
+    "processed_size": [
+      2760,
+      3612
+    ],
+    "output": "D:\\Users\\Desktop\\zhangyu\\乐境\\outputs\\明明就-midi\\source\\page-4.png"
+  }
+]

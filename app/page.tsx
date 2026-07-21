@@ -2,6 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  MidiPerformanceState,
+  closeMidiInputPort,
+  connectedMidiInputPorts,
+  isMeloVistaMidiNote,
+  openMidiInputPort,
+  parseMidiInputMessage,
+  requestMeloVistaMidiAccess,
+  watchMidiAccess,
+} from "./midi-input.mjs";
+
 type KeyDefinition = {
   code: string;
   label: string;
@@ -23,6 +34,48 @@ type AudioStatus = "idle" | "starting" | "loading" | "running" | "suspended" | "
 type PlaybackState = "idle" | "loading" | "playing" | "paused";
 type PlaybackMode = "sequential" | "repeat-one" | "shuffle";
 type BeatCount = 2 | 3 | 4 | 6;
+type MidiConnectionStatus = "idle" | "requesting" | "ready" | "connected" | "unsupported" | "denied" | "error";
+
+type MidiInputDescriptor = {
+  id: string;
+  name: string;
+  manufacturer: string;
+  state: "connected" | "disconnected";
+};
+
+type MidiMessageEventLike = {
+  data: Uint8Array | null;
+  timeStamp: number;
+};
+
+type MidiInputLike = MidiInputDescriptor & {
+  connection: "open" | "closed" | "pending";
+  onmidimessage: ((event: MidiMessageEventLike) => void) | null;
+  open?: () => Promise<unknown>;
+  close?: () => Promise<unknown>;
+};
+
+type MidiAccessLike = {
+  inputs: {
+    forEach: (callback: (input: MidiInputLike) => void) => void;
+    get: (id: string) => MidiInputLike | undefined;
+  };
+  onstatechange: (() => void) | null;
+};
+
+type NavigatorWithMidi = Navigator & {
+  requestMIDIAccess?: (options?: { sysex?: boolean; software?: boolean }) => Promise<MidiAccessLike>;
+};
+
+type MidiPerformanceAction = {
+  kind: "start" | "release";
+  key: string;
+  deviceId: string;
+  channel: number;
+  note: number;
+  velocity: number;
+  releasedWhileSustained: boolean;
+};
 
 type Voice = {
   source: AudioBufferSourceNode;
@@ -223,6 +276,28 @@ const UI_COPY = {
     performance: "性能信息",
     practice: "练习",
     metronome: "节拍器",
+    midiInput: "MIDI",
+    midiDevices: "连接设备",
+    midiStudio: "MIDI 键盘",
+    midiIntro: "连接 USB-MIDI 键盘或电钢琴，用真实力度演奏当前音色",
+    closeMidi: "关闭 MIDI 设备面板",
+    connectMidi: "授权并查找设备",
+    reconnectMidi: "重新查找设备",
+    midiRequesting: "正在请求设备权限…",
+    midiUnsupported: "当前浏览器不支持 Web MIDI，请使用桌面版 Chrome 或 Edge",
+    midiDenied: "MIDI 权限未开启，请在浏览器地址栏中允许后重试",
+    midiNoDevices: "权限已开启，暂未发现 MIDI 输入设备",
+    midiConnected: "设备已连接",
+    midiReady: "等待连接",
+    midiSelectDevice: "选择输入设备",
+    midiLastEvent: "最近输入",
+    midiWaitingEvent: "等待琴键输入",
+    midiSustain: "延音踏板",
+    midiSustainOn: "踩下",
+    midiSustainOff: "松开",
+    midiCapabilities: "支持力度、延音踏板与热插拔 · 可演奏 C1–B6",
+    midiPrivacy: "仅在当前浏览器读取按键事件，不上传设备信息；System Exclusive 已关闭",
+    midiOutOfRange: "该琴键超出乐境当前 C1–B6 音域",
     practiceStudio: "节奏练习",
     practiceIntro: "稳定节拍，并用 A–B 循环反复练习难点",
     closePractice: "关闭练习面板",
@@ -339,6 +414,28 @@ const UI_COPY = {
     performance: "Performance",
     practice: "Practice",
     metronome: "Metronome",
+    midiInput: "MIDI",
+    midiDevices: "Connect device",
+    midiStudio: "MIDI keyboard",
+    midiIntro: "Connect a USB-MIDI controller or digital piano and play the current sound with real velocity",
+    closeMidi: "Close MIDI device panel",
+    connectMidi: "Allow & find devices",
+    reconnectMidi: "Scan again",
+    midiRequesting: "Requesting MIDI permission…",
+    midiUnsupported: "Web MIDI is unavailable. Use desktop Chrome or Edge.",
+    midiDenied: "MIDI permission is blocked. Allow it from the address bar and retry.",
+    midiNoDevices: "Permission granted; no MIDI input device is connected",
+    midiConnected: "Device connected",
+    midiReady: "Waiting to connect",
+    midiSelectDevice: "Input device",
+    midiLastEvent: "Latest input",
+    midiWaitingEvent: "Waiting for a key",
+    midiSustain: "Sustain pedal",
+    midiSustainOn: "Down",
+    midiSustainOff: "Up",
+    midiCapabilities: "Velocity, sustain and hot-plug support · playable C1–B6",
+    midiPrivacy: "Key events stay in this browser. Device details are not uploaded; System Exclusive is disabled.",
+    midiOutOfRange: "That key is outside MeloVista's current C1–B6 range",
     practiceStudio: "Rhythm practice",
     practiceIntro: "Keep a steady pulse and repeat difficult sections with an A–B loop",
     closePractice: "Close practice panel",
@@ -756,6 +853,9 @@ export default function Home() {
   const activeCodesRef = useRef(new Set<string>());
   const pointerNotesRef = useRef(new Map<number, { token: string; midi: number; started: boolean }>());
   const pointerMidiCountsRef = useRef(new Map<number, number>());
+  const midiAccessRef = useRef<MidiAccessLike | null>(null);
+  const selectedMidiInputRef = useRef<MidiInputLike | null>(null);
+  const midiPerformanceRef = useRef(new MidiPerformanceState());
   const particleLayerRef = useRef<HTMLDivElement | null>(null);
   const controlDockRef = useRef<HTMLElement | null>(null);
   const midiInputRef = useRef<HTMLInputElement | null>(null);
@@ -792,6 +892,14 @@ export default function Home() {
   const [showPerformance, setShowPerformance] = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
   const [showPractice, setShowPractice] = useState(false);
+  const [showMidiDevices, setShowMidiDevices] = useState(false);
+  const [midiAccessGranted, setMidiAccessGranted] = useState(false);
+  const [midiConnectionStatus, setMidiConnectionStatus] = useState<MidiConnectionStatus>("idle");
+  const [midiInputs, setMidiInputs] = useState<MidiInputDescriptor[]>([]);
+  const [selectedMidiInputId, setSelectedMidiInputId] = useState("");
+  const [midiDeviceMidis, setMidiDeviceMidis] = useState<Set<number>>(new Set());
+  const [midiSustainActive, setMidiSustainActive] = useState(false);
+  const [midiActivity, setMidiActivity] = useState("");
   const [selectedSongId, setSelectedSongId] = useState<SongId>("fur-elise");
   const [playbackState, setPlaybackState] = useState<PlaybackState>("idle");
   const [playbackSeconds, setPlaybackSeconds] = useState(0);
@@ -840,11 +948,16 @@ export default function Home() {
 
   const releaseAll = useCallback((releaseSeconds = 0.08) => {
     [...voicesRef.current.keys()].forEach((code) => releaseVoice(code, releaseSeconds));
+    midiPerformanceRef.current.allNotesOff().forEach((action: MidiPerformanceAction) => {
+      releaseVoice(`midi-input:${action.key}`, releaseSeconds);
+    });
     activeCodesRef.current.clear();
     pointerNotesRef.current.clear();
     pointerMidiCountsRef.current.clear();
     setActiveCodes(new Set());
     setPointerMidis(new Set());
+    setMidiDeviceMidis(new Set());
+    setMidiSustainActive(false);
   }, [releaseVoice]);
 
   const toggleArticulation = useCallback(() => {
@@ -891,7 +1004,7 @@ export default function Home() {
     emitNoteLight((((octave - 1) + localX) / 6) * 100, automatic);
   }, [emitNoteLight]);
 
-  const startMidiVoice = useCallback((code: string, midi: number, eventStartedAt: number, noteLabel: string) => {
+  const startMidiVoice = useCallback((code: string, midi: number, eventStartedAt: number, noteLabel: string, velocity = 1) => {
     const context = audioContextRef.current;
     const master = masterGainRef.current;
     const currentTimbre = TIMBRE_BY_ID.get(timbreRef.current) ?? TIMBRE_OPTIONS[0];
@@ -908,7 +1021,8 @@ export default function Home() {
     source.buffer = sample.buffer;
     source.playbackRate.setValueAtTime(sample.playbackRate, now);
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(currentTimbre.gain, now + 0.003);
+    const velocityGain = Math.min(1, Math.max(0.05, velocity));
+    gain.gain.exponentialRampToValueAtTime(currentTimbre.gain * velocityGain, now + 0.003);
     source.connect(gain);
 
     if (timbreRef.current === "bright") {
@@ -1724,6 +1838,155 @@ export default function Home() {
     releasePointerNote(event.pointerId);
   }, [releasePointerNote]);
 
+  const syncMidiPerformanceVisuals = useCallback(() => {
+    setMidiDeviceMidis(midiPerformanceRef.current.activeNotes());
+    setMidiSustainActive(midiPerformanceRef.current.sustainActive);
+  }, []);
+
+  const applyMidiPerformanceActions = useCallback((actions: MidiPerformanceAction[], eventStartedAt = performance.now()) => {
+    actions.forEach((action) => {
+      const token = `midi-input:${action.key}`;
+      if (action.kind === "release") {
+        releaseVoice(token);
+        return;
+      }
+
+      const octave = Math.floor(action.note / 12) - 1;
+      const noteLabel = `${NOTE_NAMES[action.note % 12]}${octave}`;
+      const startIfActive = () => {
+        if (!midiPerformanceRef.current.has(action.key)) return true;
+        return startMidiVoice(token, action.note, eventStartedAt, noteLabel, action.velocity);
+      };
+      if (!startIfActive()) void initializeAudio().then(startIfActive);
+    });
+  }, [initializeAudio, releaseVoice, startMidiVoice]);
+
+  const handleMidiInputMessage = useCallback((deviceId: string, event: MidiMessageEventLike) => {
+    const message = parseMidiInputMessage(event.data);
+    if (!message) return;
+    const eventStartedAt = Number.isFinite(event.timeStamp) ? event.timeStamp : performance.now();
+    const state = midiPerformanceRef.current;
+    const copy = UI_COPY[localeRef.current];
+    let actions: MidiPerformanceAction[] = [];
+
+    if (message.type === "note-on") {
+      if (!isMeloVistaMidiNote(message.note)) {
+        setLastNote(copy.midiOutOfRange);
+        return;
+      }
+      actions = state.noteOn(deviceId, message.channel, message.note, message.velocity) as MidiPerformanceAction[];
+      const octave = Math.floor(message.note / 12) - 1;
+      setMidiActivity(`${NOTE_NAMES[message.note % 12]}${octave} · ${Math.round(message.velocity * 127)}/127`);
+    } else if (message.type === "note-off") {
+      actions = state.noteOff(deviceId, message.channel, message.note) as MidiPerformanceAction[];
+    } else if (message.type === "sustain") {
+      actions = state.setSustain(deviceId, message.channel, message.down) as MidiPerformanceAction[];
+      setMidiActivity(`${copy.midiSustain} · ${message.down ? copy.midiSustainOn : copy.midiSustainOff}`);
+    } else if (message.type === "all-notes-off") {
+      actions = state.allNotesOff(deviceId, message.channel) as MidiPerformanceAction[];
+    }
+
+    applyMidiPerformanceActions(actions, eventStartedAt);
+    syncMidiPerformanceVisuals();
+  }, [applyMidiPerformanceActions, syncMidiPerformanceVisuals]);
+
+  const selectMidiInput = useCallback(async (inputId: string) => {
+    const access = midiAccessRef.current;
+    const previous = selectedMidiInputRef.current;
+    if (previous && previous.id !== inputId) {
+      previous.onmidimessage = null;
+      void closeMidiInputPort(previous).catch(() => undefined);
+      const releases = midiPerformanceRef.current.allNotesOff(previous.id) as MidiPerformanceAction[];
+      applyMidiPerformanceActions(releases);
+      syncMidiPerformanceVisuals();
+    }
+
+    const input = inputId ? access?.inputs.get(inputId) : undefined;
+    if (!input || input.state !== "connected") {
+      selectedMidiInputRef.current = null;
+      setSelectedMidiInputId("");
+      setMidiConnectionStatus(access ? "ready" : "idle");
+      return;
+    }
+
+    try {
+      await openMidiInputPort(input, (event: MidiMessageEventLike) => handleMidiInputMessage(input.id, event));
+      selectedMidiInputRef.current = input;
+      setSelectedMidiInputId(input.id);
+      setMidiConnectionStatus("connected");
+      setMidiActivity("");
+      const displayName = input.name || input.manufacturer || "MIDI";
+      setLastNote(`${UI_COPY[localeRef.current].midiConnected} · ${displayName}`);
+    } catch {
+      selectedMidiInputRef.current = null;
+      setSelectedMidiInputId("");
+      setMidiConnectionStatus("error");
+    }
+  }, [applyMidiPerformanceActions, handleMidiInputMessage, syncMidiPerformanceVisuals]);
+
+  const refreshMidiInputs = useCallback(async (access = midiAccessRef.current) => {
+    if (!access) return;
+    const connectedInputs: MidiInputDescriptor[] = [];
+    connectedMidiInputPorts(access).forEach((input: MidiInputLike) => {
+      connectedInputs.push({
+        id: input.id,
+        name: input.name || "MIDI input",
+        manufacturer: input.manufacturer || "",
+        state: input.state,
+      });
+    });
+    connectedInputs.sort((a, b) => `${a.manufacturer} ${a.name}`.localeCompare(`${b.manufacturer} ${b.name}`));
+    setMidiInputs(connectedInputs);
+
+    const selectedId = selectedMidiInputRef.current?.id ?? "";
+    if (selectedId && connectedInputs.some((input) => input.id === selectedId)) {
+      setMidiConnectionStatus("connected");
+      return;
+    }
+    await selectMidiInput(connectedInputs[0]?.id ?? "");
+  }, [selectMidiInput]);
+
+  const connectMidiDevices = useCallback(async () => {
+    const midiNavigator = navigator as NavigatorWithMidi;
+    if (!midiNavigator.requestMIDIAccess) {
+      setMidiConnectionStatus("unsupported");
+      return;
+    }
+
+    if (midiAccessRef.current) {
+      setMidiConnectionStatus("requesting");
+      await refreshMidiInputs(midiAccessRef.current);
+      return;
+    }
+
+    setMidiConnectionStatus("requesting");
+    const audioReady = initializeAudio();
+    try {
+      const access = await requestMeloVistaMidiAccess(midiNavigator) as MidiAccessLike;
+      midiAccessRef.current = access;
+      setMidiAccessGranted(true);
+      watchMidiAccess(access, () => { void refreshMidiInputs(access); });
+      await refreshMidiInputs(access);
+      await audioReady;
+    } catch (error) {
+      const errorName = error instanceof DOMException ? error.name : "";
+      setMidiConnectionStatus(errorName === "NotAllowedError" || errorName === "SecurityError" ? "denied" : "error");
+    }
+  }, [initializeAudio, refreshMidiInputs]);
+
+  useEffect(() => () => {
+    const access = midiAccessRef.current;
+    if (access) access.onstatechange = null;
+    const input = selectedMidiInputRef.current;
+    if (input) {
+      input.onmidimessage = null;
+      void closeMidiInputPort(input).catch(() => undefined);
+    }
+    midiPerformanceRef.current.allNotesOff().forEach((action: MidiPerformanceAction) => {
+      releaseVoice(`midi-input:${action.key}`, 0.05);
+    });
+  }, [releaseVoice]);
+
   const selectTimbre = useCallback(async (next: Timbre) => {
     if (next === timbreRef.current || audioStatus === "loading") return;
     releaseAll(0.06);
@@ -2030,6 +2293,7 @@ export default function Home() {
   }, [releaseAll, releaseVoice, startVoice, stopMetronome, toggleArticulation]);
 
   const activeCodeSet = useMemo(() => activeCodes, [activeCodes]);
+  const liveManualMidis = useMemo(() => new Set([...pointerMidis, ...midiDeviceMidis]), [midiDeviceMidis, pointerMidis]);
   const filteredLocalSongs = useMemo(() => {
     const query = localLibrarySearch.trim().toLocaleLowerCase();
     if (!query) return localLibrarySongs;
@@ -2045,6 +2309,26 @@ export default function Home() {
   const selectedPlaybackModeLabel = playbackModeLabel(playbackMode, locale);
   const selectedTimbreLabel = selectedTimbre.label[locale];
   const selectedSceneLabel = selectedScene.label[locale];
+  const selectedMidiInput = midiInputs.find((input) => input.id === selectedMidiInputId);
+  const selectedMidiInputName = selectedMidiInput
+    ? [selectedMidiInput.manufacturer, selectedMidiInput.name].filter(Boolean).join(" · ")
+    : "";
+  const midiDockLabel = midiConnectionStatus === "connected"
+    ? (selectedMidiInput?.name ?? copy.midiConnected)
+    : midiConnectionStatus === "requesting"
+      ? copy.midiRequesting
+      : copy.midiDevices;
+  const midiStatusMessage = midiConnectionStatus === "unsupported"
+    ? copy.midiUnsupported
+    : midiConnectionStatus === "denied"
+      ? copy.midiDenied
+      : midiConnectionStatus === "requesting"
+        ? copy.midiRequesting
+        : midiConnectionStatus === "connected"
+          ? `${copy.midiConnected}${selectedMidiInputName ? ` · ${selectedMidiInputName}` : ""}`
+          : midiAccessGranted && !midiInputs.length
+            ? copy.midiNoDevices
+            : copy.midiReady;
   const selectedSongReady = Boolean(selectedSong.midiUrl || isLocalSongId(selectedSong.id));
   const audioButtonText = audioStatus === "running"
     ? (locale === "zh" ? `${selectedTimbreLabel}已就绪` : `${selectedTimbreLabel} ready`)
@@ -2059,7 +2343,7 @@ export default function Home() {
             : (locale === "zh" ? `加载并启动${selectedTimbreLabel}` : `Load & start ${selectedTimbreLabel}`);
 
   return (
-    <main className={`app-shell sunroom ${immersiveMode ? "immersive" : ""} ${activeCodes.size || pointerMidis.size ? "playing" : ""}`} data-scene={scene} data-locale={locale}>
+    <main className={`app-shell sunroom ${immersiveMode ? "immersive" : ""} ${activeCodes.size || liveManualMidis.size ? "playing" : ""}`} data-scene={scene} data-locale={locale}>
       <div className="scene-background" key={`poster-${scene}`} style={{ backgroundImage: `url(${selectedScene.image})` }} aria-hidden="true" />
       {videoEnabled && (
         <video
@@ -2133,13 +2417,17 @@ export default function Home() {
             <span className="dock-icon" aria-hidden="true">◎</span>
             <span><small>{copy.mode}</small><b>{immersiveMode ? copy.exitImmersive : copy.enterImmersive}</b></span>
           </button>
-          <button className={`dock-button ${showLibrary ? "active" : ""}`} type="button" aria-pressed={showLibrary} onClick={() => { setShowPerformance(false); setShowPractice(false); setShowLibrary((value) => !value); }} data-testid="library-toggle">
+          <button className={`dock-button ${showLibrary ? "active" : ""}`} type="button" aria-pressed={showLibrary} onClick={() => { setShowPerformance(false); setShowPractice(false); setShowMidiDevices(false); setShowLibrary((value) => !value); }} data-testid="library-toggle">
             <span className="dock-icon" aria-hidden="true">♫</span>
             <span><small>{copy.library}</small><b>{copy.appreciation}</b></span>
           </button>
-          <button className={`dock-button ${showPractice ? "active" : ""}`} type="button" aria-pressed={showPractice} onClick={() => { setShowPerformance(false); setShowLibrary(false); setShowPractice((value) => !value); }} data-testid="practice-toggle">
+          <button className={`dock-button ${showPractice ? "active" : ""}`} type="button" aria-pressed={showPractice} onClick={() => { setShowPerformance(false); setShowLibrary(false); setShowMidiDevices(false); setShowPractice((value) => !value); }} data-testid="practice-toggle">
             <span className="dock-icon" aria-hidden="true">♩</span>
             <span><small>{copy.practice}</small><b>{copy.metronome}</b></span>
+          </button>
+          <button className={`dock-button midi-device-button ${showMidiDevices || midiConnectionStatus === "connected" ? "active" : ""}`} type="button" aria-pressed={showMidiDevices} onClick={() => { setShowPerformance(false); setShowLibrary(false); setShowPractice(false); setShowMidiDevices((value) => !value); }} data-testid="midi-device-toggle">
+            <span className="dock-icon" aria-hidden="true">◉</span>
+            <span><small>{copy.midiInput}</small><b>{midiDockLabel}</b></span>
           </button>
           <button className="dock-button language-button" type="button" aria-label={copy.switchLanguage} onClick={() => changeLocale(locale === "zh" ? "en" : "zh")} data-testid="language-toggle">
             <span className="dock-icon language-icon" aria-hidden="true">文</span>
@@ -2200,6 +2488,46 @@ export default function Home() {
           </div>
           <button className="clear-loop-button" type="button" disabled={!practiceLoop.a && !practiceLoop.b} onClick={clearPracticeLoop}>{copy.clearLoop}</button>
         </section>
+      </aside>
+
+      <aside className={`midi-drawer ${showMidiDevices ? "open" : ""}`} aria-hidden={!showMidiDevices} data-testid="midi-device-drawer">
+        <div className="drawer-heading midi-heading">
+          <div><small>WEB MIDI</small><strong>{copy.midiStudio}</strong><span>{copy.midiIntro}</span></div>
+          <button type="button" onClick={() => setShowMidiDevices(false)} aria-label={copy.closeMidi}>×</button>
+        </div>
+
+        <section className={`midi-device-status ${midiConnectionStatus === "connected" ? "connected" : ""}`} role="status">
+          <i aria-hidden="true" />
+          <span><strong>{midiStatusMessage}</strong><small>{copy.midiCapabilities}</small></span>
+        </section>
+
+        <button
+          className="midi-connect-button"
+          type="button"
+          disabled={midiConnectionStatus === "requesting" || midiConnectionStatus === "unsupported"}
+          onClick={() => { void connectMidiDevices(); }}
+          data-testid="connect-midi-device"
+        >
+          <span aria-hidden="true">⌁</span>
+          {midiConnectionStatus === "requesting" ? copy.midiRequesting : midiAccessGranted ? copy.reconnectMidi : copy.connectMidi}
+        </button>
+
+        {midiInputs.length > 0 && (
+          <label className="midi-device-select">
+            <span>{copy.midiSelectDevice}</span>
+            <select value={selectedMidiInputId} onChange={(event) => { void selectMidiInput(event.currentTarget.value); }}>
+              {midiInputs.map((input) => (
+                <option value={input.id} key={input.id}>{[input.manufacturer, input.name].filter(Boolean).join(" · ")}</option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        <div className="midi-live-grid">
+          <div><small>{copy.midiLastEvent}</small><strong data-testid="midi-last-event">{midiActivity || copy.midiWaitingEvent}</strong></div>
+          <div className={midiSustainActive ? "active" : ""}><small>{copy.midiSustain}</small><strong data-testid="midi-sustain-state">{midiSustainActive ? copy.midiSustainOn : copy.midiSustainOff}</strong></div>
+        </div>
+        <p className="midi-privacy-note">{copy.midiPrivacy}</p>
       </aside>
 
       <aside className={`library-drawer ${showLibrary ? "open" : ""}`} aria-hidden={!showLibrary}>
@@ -2365,12 +2693,12 @@ export default function Home() {
               onPointerCancel={handlePianoPointerEnd}
               onLostPointerCapture={handlePianoPointerEnd}
             >
-              <PianoOctave title={copy.extendedRange} octave={1} keys={EXTREME_KEYS} activeCodes={activeCodeSet} activeMidis={pointerMidis} enabled={extremeOctave === 1} locale={locale} autoMidis={autoMidis} />
-              <PianoOctave title={copy.lowRange} octave={2} keys={LOW_KEYS} activeCodes={activeCodeSet} activeMidis={pointerMidis} enabled={lowOctave === 2} locale={locale} autoMidis={autoMidis} />
-              <PianoOctave title={copy.lowRange} octave={3} keys={LOW_KEYS} activeCodes={activeCodeSet} activeMidis={pointerMidis} enabled={lowOctave === 3} locale={locale} autoMidis={autoMidis} />
-              <PianoOctave title={copy.midRange} octave={4} keys={MID_KEYS} activeCodes={activeCodeSet} activeMidis={pointerMidis} locale={locale} autoMidis={autoMidis} />
-              <PianoOctave title={copy.highRange} octave={5} keys={HIGH_KEYS} activeCodes={activeCodeSet} activeMidis={pointerMidis} locale={locale} autoMidis={autoMidis} />
-              <PianoOctave title={copy.extendedRange} octave={6} keys={EXTREME_KEYS} activeCodes={activeCodeSet} activeMidis={pointerMidis} enabled={extremeOctave === 6} locale={locale} autoMidis={autoMidis} />
+              <PianoOctave title={copy.extendedRange} octave={1} keys={EXTREME_KEYS} activeCodes={activeCodeSet} activeMidis={liveManualMidis} enabled={extremeOctave === 1} locale={locale} autoMidis={autoMidis} />
+              <PianoOctave title={copy.lowRange} octave={2} keys={LOW_KEYS} activeCodes={activeCodeSet} activeMidis={liveManualMidis} enabled={lowOctave === 2} locale={locale} autoMidis={autoMidis} />
+              <PianoOctave title={copy.lowRange} octave={3} keys={LOW_KEYS} activeCodes={activeCodeSet} activeMidis={liveManualMidis} enabled={lowOctave === 3} locale={locale} autoMidis={autoMidis} />
+              <PianoOctave title={copy.midRange} octave={4} keys={MID_KEYS} activeCodes={activeCodeSet} activeMidis={liveManualMidis} locale={locale} autoMidis={autoMidis} />
+              <PianoOctave title={copy.highRange} octave={5} keys={HIGH_KEYS} activeCodes={activeCodeSet} activeMidis={liveManualMidis} locale={locale} autoMidis={autoMidis} />
+              <PianoOctave title={copy.extendedRange} octave={6} keys={EXTREME_KEYS} activeCodes={activeCodeSet} activeMidis={liveManualMidis} enabled={extremeOctave === 6} locale={locale} autoMidis={autoMidis} />
             </div>
           </div>
         </div>

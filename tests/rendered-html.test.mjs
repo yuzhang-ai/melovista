@@ -295,6 +295,22 @@ test("pointer piano supports mouse, glide and multi-touch across all visible oct
   assert.match(styles, /\.piano-key \{[^}]*touch-action: none/);
 });
 
+test("Web MIDI input supports permission, velocity, sustain and device lifecycle", async () => {
+  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const midiSource = await readFile(new URL("../app/midi-input.mjs", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(midiSource, /requestMIDIAccess\(\{ sysex: false, software: false \}\)/);
+  assert.match(source, /watchMidiAccess\(access/);
+  assert.match(source, /if \(midiAccessRef\.current\)[\s\S]*refreshMidiInputs\(midiAccessRef\.current\)/);
+  assert.match(source, /openMidiInputPort\(input/);
+  assert.match(source, /closeMidiInputPort\(input\)/);
+  assert.match(source, /currentTimbre\.gain \* velocityGain/);
+  assert.match(source, /data-testid="connect-midi-device"/);
+  assert.match(source, /data-testid="midi-sustain-state"/);
+  assert.match(styles, /\.midi-drawer\.open/);
+  assert.match(styles, /\.midi-device-status\.connected/);
+});
+
 test("practice mode uses Web Audio lookahead scheduling and an audio-clock A-B loop", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");

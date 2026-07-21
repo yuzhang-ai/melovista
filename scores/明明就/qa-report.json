@@ -1,0 +1,122 @@
+{
+  "score": {
+    "path": "D:\\Users\\Desktop\\zhangyu\\乐境\\outputs\\明明就-midi\\明明就-自动识谱.musicxml",
+    "parts": [
+      {
+        "id": "P1-Staff1",
+        "name": "Piano",
+        "measures": 37,
+        "note_objects": 301,
+        "highest_quarter": 148.5
+      },
+      {
+        "id": "P1-Staff2",
+        "name": "Piano",
+        "measures": 37,
+        "note_objects": 256,
+        "highest_quarter": 148.5
+      }
+    ],
+    "keys_fifths": [
+      2,
+      3
+    ],
+    "times": [
+      "4/4"
+    ]
+  },
+  "midi": {
+    "path": "D:\\Users\\Desktop\\zhangyu\\乐境\\outputs\\明明就-midi\\明明就-钢琴双轨-识谱版.mid",
+    "header": "MThd",
+    "bytes": 5399,
+    "type": 1,
+    "ticks_per_beat": 10080,
+    "duration_seconds": 149.0,
+    "tracks": [
+      {
+        "index": 0,
+        "name": "Conductor",
+        "note_ons": 0,
+        "messages": 17
+      },
+      {
+        "index": 1,
+        "name": "Piano - Right Hand",
+        "note_ons": 328,
+        "messages": 661
+      },
+      {
+        "index": 2,
+        "name": "Piano - Left Hand",
+        "note_ons": 275,
+        "messages": 555
+      }
+    ],
+    "tempos": [
+      {
+        "tick": 0,
+        "bpm": 60.0
+      }
+    ],
+    "keys": [
+      {
+        "tick": 0,
+        "key": "A"
+      },
+      {
+        "tick": 483840,
+        "key": "A"
+      },
+      {
+        "tick": 483840,
+        "key": "A"
+      },
+      {
+        "tick": 806400,
+        "key": "A"
+      },
+      {
+        "tick": 806400,
+        "key": "A"
+      },
+      {
+        "tick": 887040,
+        "key": "A"
+      },
+      {
+        "tick": 887040,
+        "key": "A"
+      },
+      {
+        "tick": 967680,
+        "key": "A"
+      },
+      {
+        "tick": 967680,
+        "key": "A"
+      },
+      {
+        "tick": 1128960,
+        "key": "A"
+      },
+      {
+        "tick": 1128960,
+        "key": "A"
+      }
+    ],
+    "times": [
+      {
+        "tick": 0,
+        "signature": "4/4"
+      },
+      {
+        "tick": 1290240,
+        "signature": "4/4"
+      },
+      {
+        "tick": 1290240,
+        "signature": "4/4"
+      }
+    ]
+  }
+}

@@ -165,6 +165,8 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
 .scene-item { min-width: 126px; }
 .timbre-button { min-width: 126px; }
 .language-button { min-width: 88px; }
+.midi-device-button { min-width: 98px; }
+.midi-device-button b { display: block; max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
 .language-icon { font: 700 13px/1 Georgia, "Times New Roman", serif; }
 .app-shell[data-locale="en"] .brand-lockup p { letter-spacing: 0.12em; }
 .dock-menu-wrap { position: relative; display: flex; }
@@ -297,7 +299,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
 .sample-credit { margin-top: 11px; color: rgba(255, 255, 255, 0.42); font-size: 8px; }
 .sample-credit a { color: rgba(255, 243, 206, 0.72); text-underline-offset: 2px; }
 
-.library-drawer, .practice-drawer {
+.library-drawer, .practice-drawer, .midi-drawer {
   position: absolute;
   z-index: 41;
   top: 105px;
@@ -318,8 +320,9 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
   transition: opacity 160ms ease, transform 160ms ease, visibility 160ms;
   scrollbar-width: thin;
 }
-.library-drawer.open, .practice-drawer.open { opacity: 1; visibility: visible; transform: none; }
+.library-drawer.open, .practice-drawer.open, .midi-drawer.open { opacity: 1; visibility: visible; transform: none; }
 .practice-drawer { width: min(360px, calc(100% - 24px)); }
+.midi-drawer { width: min(370px, calc(100% - 24px)); }
 .practice-heading { margin-bottom: 12px; }
 .practice-heading > div:first-child > span { max-width: 245px; margin-top: 2px; color: rgba(255, 255, 255, 0.5); font-size: 8px; line-height: 1.45; }
 .metronome-card, .loop-practice-card { position: relative; padding: 13px; border: 1px solid rgba(255, 255, 255, 0.11); border-radius: 15px; background: rgba(255, 255, 255, 0.045); }
@@ -365,6 +368,28 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
 .loop-points > i { color: rgba(255, 255, 255, 0.28); font-style: normal; }
 .clear-loop-button { display: block; margin: 8px auto 0; padding: 4px 8px; color: rgba(255, 255, 255, 0.38); font-size: 7px; border: 0; background: transparent; cursor: pointer; }
 .clear-loop-button:disabled { opacity: 0.28; cursor: default; }
+.midi-heading { margin-bottom: 12px; }
+.midi-heading > div:first-child > span { max-width: 270px; margin-top: 2px; color: rgba(255, 255, 255, 0.5); font-size: 8px; line-height: 1.45; }
+.midi-device-status { display: flex; align-items: center; gap: 10px; min-height: 58px; padding: 11px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; background: rgba(255, 255, 255, 0.04); }
+.midi-device-status > i { flex: none; width: 11px; height: 11px; border: 1px solid rgba(255, 255, 255, 0.38); border-radius: 50%; background: rgba(255, 255, 255, 0.12); }
+.midi-device-status.connected { border-color: rgba(152, 216, 193, 0.3); background: rgba(91, 164, 139, 0.08); }
+.midi-device-status.connected > i { border-color: #caffec; background: #78d8b6; box-shadow: 0 0 17px rgba(120, 216, 182, 0.74); }
+.midi-device-status > span { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.midi-device-status strong { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.midi-device-status small { color: rgba(255, 255, 255, 0.42); font-size: 7px; line-height: 1.4; }
+.midi-connect-button { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 34px; margin-top: 9px; color: #17392e; font-size: 8px; font-weight: 750; border: 0; border-radius: 10px; background: #98d8c1; box-shadow: 0 0 22px rgba(152, 216, 193, 0.14); cursor: pointer; }
+.midi-connect-button:disabled { opacity: 0.42; cursor: not-allowed; }
+.midi-device-select { display: grid; gap: 5px; margin-top: 9px; }
+.midi-device-select > span { color: rgba(255, 255, 255, 0.46); font-size: 7px; }
+.midi-device-select select { width: 100%; height: 34px; padding: 0 9px; color: white; font-size: 8px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 9px; outline: none; background: rgba(255, 255, 255, 0.07); }
+.midi-device-select option { color: #221d16; background: white; }
+.midi-live-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 9px; }
+.midi-live-grid > div { display: flex; min-width: 0; flex-direction: column; gap: 5px; padding: 9px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; background: rgba(255, 255, 255, 0.035); }
+.midi-live-grid > div.active { border-color: rgba(237, 198, 109, 0.3); background: rgba(237, 198, 109, 0.08); }
+.midi-live-grid small { color: rgba(255, 255, 255, 0.4); font-size: 7px; }
+.midi-live-grid strong { overflow: hidden; color: rgba(255, 255, 255, 0.84); font: 700 9px/1.2 var(--font-geist-mono), monospace; text-overflow: ellipsis; white-space: nowrap; }
+.midi-live-grid > div.active strong { color: #ffe39a; }
+.midi-privacy-note { margin: 9px 2px 0; color: rgba(255, 255, 255, 0.34); font-size: 7px; line-height: 1.55; }
 .library-heading { margin-bottom: 11px; }
 .library-heading > div:first-child > span { max-width: 245px; margin-top: 2px; color: rgba(255, 255, 255, 0.5); font-size: 8px; line-height: 1.45; }
 .drawer-actions { flex-direction: row !important; }
@@ -625,7 +650,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
 
 .immersive.playing .brand-lockup, .immersive.playing .audio-cluster { opacity: 0.12; }
 
-@media (max-width: 1040px) {
+@media (max-width: 1320px) {
   .floating-header { right: 14px; left: 14px; grid-template-columns: 1fr auto; }
   .brand-lockup { display: none; }
   .control-dock { justify-self: start; grid-column: 1; }
@@ -645,7 +670,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); out
   .control-dock { justify-content: flex-start; flex-wrap: wrap; max-width: calc(100vw - 28px); overflow: visible; border-radius: 18px; }
   .dock-item, .dock-button { flex: none; }
   .performance-drawer { top: 154px; right: 12px; }
-  .library-drawer, .practice-drawer { top: 154px; right: 12px; max-height: calc(100svh - 365px); }
+  .library-drawer, .practice-drawer, .midi-drawer { top: 154px; right: 12px; max-height: calc(100svh - 365px); }
   .performance-pill { right: 16px; bottom: 240px; min-width: 300px; }
   .performance-pill > div { min-width: 68px; }
   .performance-pill .current-note { display: none; }
