@@ -114,4 +114,6 @@ npm.cmd run build
 
 发布前还需使用内置扬声器或有线耳机人工弹奏，确认真实端到端延迟、和弦并发与长短音尾音符合听感预期。
 
+换电脑继续开发时，请先阅读 [`docs/DEVELOPMENT_HANDOFF.md`](./docs/DEVELOPMENT_HANDOFF.md)。其中集中维护当前开发状态、已知风险、下一阶段规划、新电脑启动命令和人工冒烟检查清单。
+
 后续“自动听曲并可同时跟弹”的产品与技术设计见 [`docs/APPRECIATION_MODE.md`](./docs/APPRECIATION_MODE.md)。最初的 MVP 技术方案保存在 [`docs/钢琴气泡模拟器-MVP技术方案.md`](./docs/钢琴气泡模拟器-MVP技术方案.md)，配套的 8 周入门计划与打卡表位于 [`从0到1钢琴学习/`](./从0到1钢琴学习/README.md)。
