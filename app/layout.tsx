@@ -22,11 +22,11 @@ const deploymentUrl = deploymentHost.startsWith("http")
 
 export const metadata: Metadata = {
   metadataBase: new URL(deploymentUrl),
-  title: "乐境 MeloVista · 沉浸式六音区钢琴",
-  description: "乐境 MeloVista 提供中英文界面、USB-MIDI 键盘输入、本地 MIDI 文件夹曲库、鼠标触控钢琴、节拍器与 A–B 循环练习。",
+  title: "琴窗 MeloVista · 沉浸式六音区钢琴",
+  description: "琴窗 MeloVista 是一间可以选择风景、载入本地窗景并自由演奏的沉浸式浏览器琴房。",
   openGraph: {
-    title: "乐境 MeloVista · Immersive Piano",
-    description: "A bilingual immersive piano room with USB-MIDI input, a private local library, touch performance, a precise metronome and A-B loop practice.",
+    title: "琴窗 MeloVista · Immersive Piano",
+    description: "An immersive browser piano where every player can choose a view or open a private local window of their own.",
     images: ["/scenes/coast-video-poster.jpg"],
   },
 };

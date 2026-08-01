@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 
 import {
   MidiPerformanceState,
@@ -12,6 +13,7 @@ import {
   requestMeloVistaMidiAccess,
   watchMidiAccess,
 } from "./midi-input.mjs";
+import { validateCustomSceneFile } from "./custom-scene.mjs";
 
 type KeyDefinition = {
   code: string;
@@ -24,6 +26,7 @@ type KeyDefinition = {
 type Articulation = "short" | "long";
 type Timbre = "acoustic" | "bright" | "violin" | "guitar" | "saxophone";
 type SceneId = "coast" | "forest" | "rain" | "stars";
+type DisplayedSceneId = SceneId | "custom";
 type Locale = "zh" | "en";
 type BuiltInSongId = "merry-christmas-mr-lawrence" | "dandelions-promise" | "flower-sea" | "fur-elise";
 type LocalSongId = `local:${string}`;
@@ -160,6 +163,12 @@ type SceneOption = {
   videoPosition: string;
 };
 
+type CustomSceneMedia = {
+  kind: "image" | "video";
+  name: string;
+  url: string;
+};
+
 type AmbientVoice = {
   source: AudioBufferSourceNode;
   gain: GainNode;
@@ -250,15 +259,30 @@ const AMBIENT_CROSSFADE_SECONDS = 0.8;
 
 const UI_COPY = {
   zh: {
-    brand: "乐境 MeloVista",
-    tagline: "四景 · 六音区沉浸式琴房",
-    documentTitle: "乐境 MeloVista · 沉浸式六音区钢琴",
+    brand: "琴窗 MeloVista",
+    tagline: "一扇窗，一架琴",
+    documentTitle: "琴窗 MeloVista · 沉浸式六音区钢琴",
     language: "语言",
     languageName: "中文",
     switchLanguage: "切换至英文界面",
     scene: "场景",
     chooseScene: "选择场景",
     chooseWindow: "选择一扇窗",
+    customWindow: "我的窗景",
+    customWindowEmpty: "选择本地图片或视频",
+    customWindowReady: "仅在当前浏览器中显示",
+    customWindowLoading: "正在打开这扇窗…",
+    customWindowReplace: "更换",
+    customWindowRemove: "移除",
+    customWindowPrivacy: "图片或视频不会上传，刷新后需要重新选择",
+    customWindowUnsupported: "请选择 JPG、PNG、WebP、AVIF、MP4、WebM 或 MOV 文件",
+    customWindowEmptyFile: "这个文件是空的，请换一个文件",
+    customWindowImageTooLarge: "图片不能超过 20 MB",
+    customWindowVideoTooLarge: "视频不能超过 200 MB",
+    customWindowDecodeFailed: "浏览器无法打开这个文件，建议使用 JPG 图片或 H.264 MP4 视频",
+    customWindowActive: "已进入我的窗景",
+    customWindowNoAmbient: "我的窗景默认不播放环境声",
+    customWindowMuted: "窗景静音",
     timbre: "音色",
     chooseTimbre: "选择音色",
     chooseInstrument: "选择乐器音色",
@@ -295,11 +319,11 @@ const UI_COPY = {
     midiSustain: "延音踏板",
     midiSustainOn: "踩下",
     midiSustainOff: "松开",
-    midiCapabilities: "支持力度、延音踏板与热插拔 · 可演奏 C1–B6",
+    midiCapabilities: "支持力度、延音踏板与热插拔 · 可演奏 C1-B6",
     midiPrivacy: "仅在当前浏览器读取按键事件，不上传设备信息；System Exclusive 已关闭",
-    midiOutOfRange: "该琴键超出乐境当前 C1–B6 音域",
+    midiOutOfRange: "该琴键超出琴窗当前 C1-B6 音域",
     practiceStudio: "节奏练习",
-    practiceIntro: "稳定节拍，并用 A–B 循环反复练习难点",
+    practiceIntro: "稳定节拍，并用 A-B 循环反复练习难点",
     closePractice: "关闭练习面板",
     startMetronome: "启动节拍器",
     stopMetronome: "停止节拍器",
@@ -310,14 +334,14 @@ const UI_COPY = {
     syncSongTempo: "跟随当前曲目",
     songTempoUnavailable: "当前曲目尚未读取到速度",
     metronomeSynced: "节拍器已同步当前曲目",
-    loopPractice: "A–B 片段循环",
+    loopPractice: "A-B 片段循环",
     setLoopA: "设为 A 点",
     setLoopB: "设为 B 点",
     clearLoop: "清除循环",
-    enableLoop: "启用 A–B 循环",
-    disableLoop: "关闭 A–B 循环",
+    enableLoop: "启用 A-B 循环",
+    disableLoop: "关闭 A-B 循环",
     loopNeedsSong: "先选择并加载一首曲目",
-    loopReady: "A–B 循环已就绪",
+    loopReady: "A-B 循环已就绪",
     currentPosition: "当前播放位置",
     library: "曲库",
     appreciation: "欣赏模式",
@@ -383,13 +407,13 @@ const UI_COPY = {
     extendedHint: "扩展音区",
     lowHint: "低音区",
     headphoneHint: "建议使用有线耳机获得最佳体验",
-    githubCredit: "在 GitHub 查看乐境开源项目",
+    githubCredit: "在 GitHub 查看琴窗开源项目",
     waitingSource: "等待加载原声音源",
     languageChanged: "已切换至中文界面",
   },
   en: {
     brand: "MeloVista",
-    tagline: "FOUR SCENES · SIX OCTAVES",
+    tagline: "ONE WINDOW · ONE PIANO",
     documentTitle: "MeloVista · Immersive Six-Octave Piano",
     language: "Language",
     languageName: "EN",
@@ -397,6 +421,21 @@ const UI_COPY = {
     scene: "Scene",
     chooseScene: "Choose a scene",
     chooseWindow: "Choose a window",
+    customWindow: "My Window",
+    customWindowEmpty: "Choose a local image or video",
+    customWindowReady: "Shown only in this browser",
+    customWindowLoading: "Opening your window…",
+    customWindowReplace: "Replace",
+    customWindowRemove: "Remove",
+    customWindowPrivacy: "Your media is never uploaded; choose it again after refreshing",
+    customWindowUnsupported: "Choose a JPG, PNG, WebP, AVIF, MP4, WebM or MOV file",
+    customWindowEmptyFile: "This file is empty. Choose another file.",
+    customWindowImageTooLarge: "Images must be 20 MB or smaller",
+    customWindowVideoTooLarge: "Videos must be 200 MB or smaller",
+    customWindowDecodeFailed: "This browser cannot open the file. Try a JPG image or H.264 MP4 video.",
+    customWindowActive: "Entered My Window",
+    customWindowNoAmbient: "My Window does not play background ambience",
+    customWindowMuted: "Window muted",
     timbre: "Voice",
     chooseTimbre: "Choose a voice",
     chooseInstrument: "Choose an instrument voice",
@@ -433,11 +472,11 @@ const UI_COPY = {
     midiSustain: "Sustain pedal",
     midiSustainOn: "Down",
     midiSustainOff: "Up",
-    midiCapabilities: "Velocity, sustain and hot-plug support · playable C1–B6",
+    midiCapabilities: "Velocity, sustain and hot-plug support · playable C1-B6",
     midiPrivacy: "Key events stay in this browser. Device details are not uploaded; System Exclusive is disabled.",
-    midiOutOfRange: "That key is outside MeloVista's current C1–B6 range",
+    midiOutOfRange: "That key is outside MeloVista's current C1-B6 range",
     practiceStudio: "Rhythm practice",
-    practiceIntro: "Keep a steady pulse and repeat difficult sections with an A–B loop",
+    practiceIntro: "Keep a steady pulse and repeat difficult sections with an A-B loop",
     closePractice: "Close practice panel",
     startMetronome: "Start metronome",
     stopMetronome: "Stop metronome",
@@ -448,14 +487,14 @@ const UI_COPY = {
     syncSongTempo: "Use current song tempo",
     songTempoUnavailable: "No tempo has been read from the current song yet",
     metronomeSynced: "Metronome synced to the current song",
-    loopPractice: "A–B section loop",
+    loopPractice: "A-B section loop",
     setLoopA: "Set point A",
     setLoopB: "Set point B",
     clearLoop: "Clear loop",
-    enableLoop: "Enable A–B loop",
-    disableLoop: "Disable A–B loop",
+    enableLoop: "Enable A-B loop",
+    disableLoop: "Disable A-B loop",
     loopNeedsSong: "Choose and load a song first",
-    loopReady: "A–B loop is ready",
+    loopReady: "A-B loop is ready",
     currentPosition: "Current playback position",
     library: "Library",
     appreciation: "Listen",
@@ -728,6 +767,53 @@ function isMidiFile(file: File) {
   return /\.(mid|midi)$/i.test(file.name);
 }
 
+function customSceneErrorMessage(code: string, locale: Locale) {
+  const copy = UI_COPY[locale];
+  if (code === "empty-file") return copy.customWindowEmptyFile;
+  if (code === "image-too-large") return copy.customWindowImageTooLarge;
+  if (code === "video-too-large") return copy.customWindowVideoTooLarge;
+  if (code === "decode-failed") return copy.customWindowDecodeFailed;
+  return copy.customWindowUnsupported;
+}
+
+function waitForCustomSceneMedia(kind: CustomSceneMedia["kind"], url: string, mimeType: string) {
+  if (kind === "image") {
+    return new Promise<void>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("decode-failed"));
+      image.src = url;
+    });
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const video = document.createElement("video");
+    const cleanup = () => {
+      video.onloadeddata = null;
+      video.onerror = null;
+      video.removeAttribute("src");
+      video.load();
+    };
+    if (mimeType && video.canPlayType(mimeType) === "") {
+      reject(new Error("decode-failed"));
+      return;
+    }
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.onloadeddata = () => {
+      cleanup();
+      resolve();
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error("decode-failed"));
+    };
+    video.src = url;
+    video.load();
+  });
+}
+
 function playbackModeLabel(mode: PlaybackMode, locale: Locale) {
   const copy = UI_COPY[locale];
   return mode === "repeat-one" ? copy.repeatOne : mode === "shuffle" ? copy.shuffle : copy.sequential;
@@ -823,7 +909,7 @@ function PianoOctave({
         </div>
         );
       })}
-      <div className="octave-caption">C{octave}—B{octave} · {enabled ? copy.current : copy.waitingSwitch}</div>
+      <div className="octave-caption">C{octave}-B{octave} · {enabled ? copy.current : copy.waitingSwitch}</div>
     </section>
   );
 }
@@ -860,6 +946,10 @@ export default function Home() {
   const controlDockRef = useRef<HTMLElement | null>(null);
   const midiInputRef = useRef<HTMLInputElement | null>(null);
   const midiFolderInputRef = useRef<HTMLInputElement | null>(null);
+  const customSceneInputRef = useRef<HTMLInputElement | null>(null);
+  const customSceneRef = useRef<CustomSceneMedia | null>(null);
+  const pendingCustomSceneUrlRef = useRef<string | null>(null);
+  const customSceneActiveRef = useRef(false);
   const ambientBuffersRef = useRef(new Map<SceneId, AudioBuffer>());
   const ambientVoiceRef = useRef<AmbientVoice | null>(null);
   const ambientEnabledRef = useRef(false);
@@ -883,9 +973,13 @@ export default function Home() {
   const [articulation, setArticulation] = useState<Articulation>("short");
   const [timbre, setTimbre] = useState<Timbre>("acoustic");
   const [scene, setScene] = useState<SceneId>("coast");
+  const [customScene, setCustomScene] = useState<CustomSceneMedia | null>(null);
+  const [customSceneActive, setCustomSceneActive] = useState(false);
+  const [customSceneLoading, setCustomSceneLoading] = useState(false);
+  const [customSceneError, setCustomSceneError] = useState("");
   const [locale, setLocale] = useState<Locale>("zh");
   const [videoEnabled, setVideoEnabled] = useState(false);
-  const [readyVideoScene, setReadyVideoScene] = useState<SceneId | null>(null);
+  const [readyVideoScene, setReadyVideoScene] = useState<DisplayedSceneId | null>(null);
   const [ambientEnabled, setAmbientEnabled] = useState(false);
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const [immersiveMode, setImmersiveMode] = useState(false);
@@ -1309,6 +1403,7 @@ export default function Home() {
   }, []);
 
   const toggleAmbientAudio = useCallback(async () => {
+    if (customSceneActiveRef.current) return;
     const enabled = !ambientEnabledRef.current;
     if (enabled && !audioContextRef.current) {
       ambientPreferenceRef.current = "on";
@@ -2028,14 +2123,81 @@ export default function Home() {
     const option = SCENE_BY_ID.get(next) ?? SCENE_OPTIONS[0];
     const currentLocale = localeRef.current;
     sceneRef.current = next;
+    customSceneActiveRef.current = false;
     setReadyVideoScene(null);
     setScene(next);
+    setCustomSceneActive(false);
+    setCustomSceneError("");
     setOpenMenu(null);
     particleLayerRef.current?.replaceChildren();
     setLastNote(currentLocale === "zh"
       ? `已进入${option.label.zh} · ${option.detail.zh}`
       : `Entered ${option.label.en} · ${option.detail.en}`);
   }, []);
+
+  const activateCustomScene = useCallback(() => {
+    if (!customSceneRef.current) return;
+    customSceneActiveRef.current = true;
+    ambientEnabledRef.current = false;
+    ambientPreferenceRef.current = "off";
+    fadeOutAmbientVoice(0.24);
+    setAmbientEnabled(false);
+    setReadyVideoScene(null);
+    setCustomSceneActive(true);
+    setCustomSceneError("");
+    setOpenMenu(null);
+    particleLayerRef.current?.replaceChildren();
+    setLastNote(UI_COPY[localeRef.current].customWindowActive);
+  }, [fadeOutAmbientVoice]);
+
+  const handleCustomSceneFile = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+
+    const currentLocale = localeRef.current;
+    const validation = validateCustomSceneFile(file);
+    if (!validation.ok || (validation.kind !== "image" && validation.kind !== "video")) {
+      const message = customSceneErrorMessage(validation.code ?? "unsupported-type", currentLocale);
+      setCustomSceneError(message);
+      setLastNote(message);
+      return;
+    }
+    const kind: CustomSceneMedia["kind"] = validation.kind;
+
+    setCustomSceneLoading(true);
+    setCustomSceneError("");
+    const url = URL.createObjectURL(file);
+    pendingCustomSceneUrlRef.current = url;
+    try {
+      await waitForCustomSceneMedia(kind, url, file.type);
+      const previous = customSceneRef.current;
+      const next: CustomSceneMedia = { kind, name: file.name, url };
+      customSceneRef.current = next;
+      pendingCustomSceneUrlRef.current = null;
+      setCustomScene(next);
+      activateCustomScene();
+      if (previous) URL.revokeObjectURL(previous.url);
+    } catch {
+      pendingCustomSceneUrlRef.current = null;
+      URL.revokeObjectURL(url);
+      const message = customSceneErrorMessage("decode-failed", currentLocale);
+      setCustomSceneError(message);
+      setLastNote(message);
+    } finally {
+      setCustomSceneLoading(false);
+    }
+  }, [activateCustomScene]);
+
+  const removeCustomScene = useCallback(() => {
+    const previous = customSceneRef.current;
+    customSceneRef.current = null;
+    setCustomScene(null);
+    setCustomSceneError("");
+    if (customSceneActiveRef.current) selectScene(sceneRef.current);
+    if (previous) URL.revokeObjectURL(previous.url);
+  }, [selectScene]);
 
   const changeLocale = useCallback((next: Locale, announce = true) => {
     localeRef.current = next;
@@ -2170,6 +2332,8 @@ export default function Home() {
     });
     fadeOutAmbientVoice(0.04);
     stopMetronome();
+    if (customSceneRef.current) URL.revokeObjectURL(customSceneRef.current.url);
+    if (pendingCustomSceneUrlRef.current) URL.revokeObjectURL(pendingCustomSceneUrlRef.current);
   }, [fadeOutAmbientVoice, stopMetronome]);
 
   useEffect(() => {
@@ -2201,8 +2365,8 @@ export default function Home() {
         setLowOctave(nextOctave);
         setActiveCodes(new Set(activeCodesRef.current));
         setLastNote(localeRef.current === "zh"
-          ? `低音区已切换到 C${nextOctave} — B${nextOctave}`
-          : `Low register switched to C${nextOctave} — B${nextOctave}`);
+          ? `低音区已切换到 C${nextOctave}-B${nextOctave}`
+          : `Low register switched to C${nextOctave}-B${nextOctave}`);
         return;
       }
 
@@ -2218,8 +2382,8 @@ export default function Home() {
         setExtremeOctave(nextOctave);
         setActiveCodes(new Set(activeCodesRef.current));
         setLastNote(localeRef.current === "zh"
-          ? `扩展音区已切换到 C${nextOctave} — B${nextOctave}`
-          : `Extended range switched to C${nextOctave} — B${nextOctave}`);
+          ? `扩展音区已切换到 C${nextOctave}-B${nextOctave}`
+          : `Extended range switched to C${nextOctave}-B${nextOctave}`);
         return;
       }
 
@@ -2302,13 +2466,19 @@ export default function Home() {
   const copy = UI_COPY[locale];
   const selectedTimbre = TIMBRE_BY_ID.get(timbre) ?? TIMBRE_OPTIONS[0];
   const selectedScene = SCENE_BY_ID.get(scene) ?? SCENE_OPTIONS[0];
+  const displayedSceneId: DisplayedSceneId = customSceneActive ? "custom" : scene;
+  const displayedBackground = customSceneActive && customScene?.kind === "image" ? customScene.url : selectedScene.image;
+  const displayedVideo = customSceneActive && customScene?.kind === "video" ? customScene.url : selectedScene.video;
+  const shouldRenderSceneVideo = customSceneActive
+    ? customScene?.kind === "video"
+    : videoEnabled;
   const selectedSong = SONG_BY_ID.get(selectedSongId)
     ?? localLibrarySongs.find((song) => song.id === selectedSongId)
     ?? LIBRARY_SONGS[0];
   const selectedSongTitle = librarySongTitle(selectedSong, locale);
   const selectedPlaybackModeLabel = playbackModeLabel(playbackMode, locale);
   const selectedTimbreLabel = selectedTimbre.label[locale];
-  const selectedSceneLabel = selectedScene.label[locale];
+  const selectedSceneLabel = customSceneActive ? copy.customWindow : selectedScene.label[locale];
   const selectedMidiInput = midiInputs.find((input) => input.id === selectedMidiInputId);
   const selectedMidiInputName = selectedMidiInput
     ? [selectedMidiInput.manufacturer, selectedMidiInput.name].filter(Boolean).join(" · ")
@@ -2343,23 +2513,30 @@ export default function Home() {
             : (locale === "zh" ? `加载并启动${selectedTimbreLabel}` : `Load & start ${selectedTimbreLabel}`);
 
   return (
-    <main className={`app-shell sunroom ${immersiveMode ? "immersive" : ""} ${activeCodes.size || liveManualMidis.size ? "playing" : ""}`} data-scene={scene} data-locale={locale}>
-      <div className="scene-background" key={`poster-${scene}`} style={{ backgroundImage: `url(${selectedScene.image})` }} aria-hidden="true" />
-      {videoEnabled && (
+    <main className={`app-shell sunroom ${immersiveMode ? "immersive" : ""} ${activeCodes.size || liveManualMidis.size ? "playing" : ""}`} data-scene={displayedSceneId} data-locale={locale}>
+      <div className="scene-background" key={`poster-${displayedSceneId}-${displayedBackground}`} style={{ backgroundImage: `url(${displayedBackground})` }} aria-hidden="true" />
+      {shouldRenderSceneVideo && (
         <video
-          className={`scene-video ${readyVideoScene === scene ? "ready" : ""}`}
-          key={scene}
-          src={selectedScene.video}
-          poster={selectedScene.image}
-          style={{ objectPosition: selectedScene.videoPosition }}
-          autoPlay
+          className={`scene-video ${customSceneActive ? "custom-scene-video" : ""} ${readyVideoScene === displayedSceneId ? "ready" : ""}`}
+          key={`${displayedSceneId}-${displayedVideo}`}
+          src={displayedVideo}
+          poster={customSceneActive ? undefined : selectedScene.image}
+          style={{ objectPosition: customSceneActive ? "50% 50%" : selectedScene.videoPosition }}
+          autoPlay={videoEnabled}
           loop
           muted
           playsInline
           preload="auto"
           disablePictureInPicture
           tabIndex={-1}
-          onCanPlay={() => setReadyVideoScene(scene)}
+          onCanPlay={() => setReadyVideoScene(displayedSceneId)}
+          onError={() => {
+            if (!customSceneActive) return;
+            const message = copy.customWindowDecodeFailed;
+            setReadyVideoScene(null);
+            setCustomSceneError(message);
+            setLastNote(message);
+          }}
           aria-hidden="true"
         />
       )}
@@ -2384,12 +2561,49 @@ export default function Home() {
             <div className={`glass-menu scene-menu ${openMenu === "scene" ? "open" : ""}`} role="listbox" aria-label={copy.chooseScene}>
               <div className="menu-heading"><small>SCENES</small><strong>{copy.chooseWindow}</strong></div>
               {SCENE_OPTIONS.map((option) => (
-                <button className={scene === option.id ? "selected" : ""} type="button" role="option" aria-selected={scene === option.id} key={option.id} onClick={() => selectScene(option.id)}>
+                <button className={!customSceneActive && scene === option.id ? "selected" : ""} type="button" role="option" aria-selected={!customSceneActive && scene === option.id} key={option.id} onClick={() => selectScene(option.id)}>
                   <i className="scene-thumb" style={{ backgroundImage: `url(${option.image})` }} aria-hidden="true" />
                   <span><strong>{option.label[locale]}</strong><small>{option.detail[locale]}</small></span>
-                  <b aria-hidden="true">{scene === option.id ? "✓" : ""}</b>
+                  <b aria-hidden="true">{!customSceneActive && scene === option.id ? "✓" : ""}</b>
                 </button>
               ))}
+              <input
+                className="visually-hidden"
+                ref={customSceneInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/avif,video/mp4,video/webm,video/quicktime,.mov"
+                onChange={handleCustomSceneFile}
+                data-testid="custom-scene-input"
+              />
+              <button
+                className={`custom-scene-option ${customSceneActive ? "selected" : ""}`}
+                type="button"
+                role="option"
+                aria-selected={customSceneActive}
+                disabled={customSceneLoading}
+                onClick={() => customScene ? activateCustomScene() : customSceneInputRef.current?.click()}
+                data-testid="custom-scene-option"
+              >
+                <i
+                  className={`scene-thumb custom-scene-thumb ${customScene?.kind ?? "empty"}`}
+                  style={customScene?.kind === "image" ? { backgroundImage: `url(${customScene.url})` } : undefined}
+                  aria-hidden="true"
+                />
+                <span>
+                  <strong>{copy.customWindow}</strong>
+                  <small title={customScene?.name}>{customSceneLoading ? copy.customWindowLoading : customScene ? customScene.name : copy.customWindowEmpty}</small>
+                </span>
+                <b aria-hidden="true">{customSceneActive ? "✓" : customScene ? "↗" : "+"}</b>
+              </button>
+              {customScene && (
+                <div className="custom-scene-actions" role="group" aria-label={copy.customWindow}>
+                  <button type="button" disabled={customSceneLoading} onClick={() => customSceneInputRef.current?.click()}>{copy.customWindowReplace}</button>
+                  <button type="button" disabled={customSceneLoading} onClick={removeCustomScene}>{copy.customWindowRemove}</button>
+                </div>
+              )}
+              <p className={`custom-scene-message ${customSceneError ? "error" : ""}`} role={customSceneError ? "alert" : "status"}>
+                {customSceneError || (customScene ? copy.customWindowReady : copy.customWindowPrivacy)}
+              </p>
             </div>
           </div>
           <div className="dock-menu-wrap timbre-selector">
@@ -2436,10 +2650,10 @@ export default function Home() {
         </nav>
 
         <div className="audio-cluster">
-          <button className={`ambient-toggle ${ambientEnabled ? "active" : ""}`} type="button" aria-pressed={ambientEnabled} aria-label={copy.toggleAmbient} onClick={() => { void toggleAmbientAudio(); }} data-testid="ambient-toggle">
+          <button className={`ambient-toggle ${ambientEnabled ? "active" : ""}`} type="button" aria-pressed={ambientEnabled} aria-label={customSceneActive ? copy.customWindowNoAmbient : copy.toggleAmbient} disabled={customSceneActive} onClick={() => { void toggleAmbientAudio(); }} data-testid="ambient-toggle">
             <span aria-hidden="true">≋</span>
             <small>{copy.ambient}</small>
-            <b>{ambientEnabled ? copy.ambientOn : copy.ambientOff}</b>
+            <b>{customSceneActive ? copy.customWindowMuted : ambientEnabled ? copy.ambientOn : copy.ambientOff}</b>
           </button>
           <button className={`audio-status ${isAudioReady ? "ready" : ""}`} onClick={initializeAudio} disabled={audioStatus === "loading"} data-testid="start-audio">
             <i />
@@ -2484,7 +2698,7 @@ export default function Home() {
           <div className="loop-points">
             <button type="button" onClick={setPracticeLoopA}><small>A</small><strong>{formatPlaybackTime(practiceLoop.a)}</strong><span>{copy.setLoopA}</span></button>
             <i aria-hidden="true">→</i>
-            <button type="button" onClick={setPracticeLoopB}><small>B</small><strong>{practiceLoop.b ? formatPlaybackTime(practiceLoop.b) : "—:—"}</strong><span>{copy.setLoopB}</span></button>
+            <button type="button" onClick={setPracticeLoopB}><small>B</small><strong>{practiceLoop.b ? formatPlaybackTime(practiceLoop.b) : "-:-"}</strong><span>{copy.setLoopB}</span></button>
           </div>
           <button className="clear-loop-button" type="button" disabled={!practiceLoop.a && !practiceLoop.b} onClick={clearPracticeLoop}>{copy.clearLoop}</button>
         </section>
@@ -2621,7 +2835,7 @@ export default function Home() {
 
           <div className="song-progress">
             <input type="range" min="0" max={Math.max(trackDuration, 1)} step="0.1" value={Math.min(playbackSeconds, Math.max(trackDuration, 1))} disabled={!trackDuration} aria-label={copy.currentNote} onChange={(event) => seekLibraryPlayback(Number(event.target.value))} />
-            <span>{formatPlaybackTime(playbackSeconds)} / {trackDuration ? formatPlaybackTime(trackDuration) : "—:—"}</span>
+            <span>{formatPlaybackTime(playbackSeconds)} / {trackDuration ? formatPlaybackTime(trackDuration) : "-:-"}</span>
           </div>
 
           <div className="transport-controls">
@@ -2663,9 +2877,9 @@ export default function Home() {
         <dl>
           <div><dt>{copy.recentSchedule}</dt><dd>{lastScheduleMs.toFixed(2)} ms</dd></div>
           <div><dt>{copy.p95}</dt><dd>{p95ScheduleMs.toFixed(2)} ms</dd></div>
-          <div><dt>{copy.baseLatency}</dt><dd>{diagnostics ? `${(diagnostics.baseLatency * 1000).toFixed(1)} ms` : "—"}</dd></div>
-          <div><dt>{copy.outputLatency}</dt><dd>{diagnostics?.outputLatency != null ? `${(diagnostics.outputLatency * 1000).toFixed(1)} ms` : "—"}</dd></div>
-          <div><dt>{copy.sampleRate}</dt><dd>{diagnostics ? `${diagnostics.sampleRate} Hz` : "—"}</dd></div>
+          <div><dt>{copy.baseLatency}</dt><dd>{diagnostics ? `${(diagnostics.baseLatency * 1000).toFixed(1)} ms` : "-"}</dd></div>
+          <div><dt>{copy.outputLatency}</dt><dd>{diagnostics?.outputLatency != null ? `${(diagnostics.outputLatency * 1000).toFixed(1)} ms` : "-"}</dd></div>
+          <div><dt>{copy.sampleRate}</dt><dd>{diagnostics ? `${diagnostics.sampleRate} Hz` : "-"}</dd></div>
           <div><dt>{copy.currentAction}</dt><dd data-testid="last-note">{lastNote}</dd></div>
         </dl>
         <p>{copy.performanceNote}</p>

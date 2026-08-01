@@ -43,8 +43,8 @@ test("server-renders the immersive six-range piano", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>乐境 MeloVista · 沉浸式六音区钢琴<\/title>/i);
-  assert.match(html, /乐境 MeloVista/);
+  assert.match(html, /<title>琴窗 MeloVista · 沉浸式六音区钢琴<\/title>/i);
+  assert.match(html, /琴窗 MeloVista/);
   assert.match(html, /沧海听风/);
   assert.match(html, /加载并启动原声/);
   assert.match(html, /aria-label="扩展音区 C1 到 B1，当前可演奏"/);
@@ -59,6 +59,10 @@ test("server-renders the immersive six-range piano", async () => {
   assert.match(html, /山湖静语/);
   assert.match(html, /雨夜伴灯/);
   assert.match(html, /暮光之城/);
+  assert.match(html, /我的窗景/);
+  assert.match(html, /选择本地图片或视频/);
+  assert.match(html, /图片或视频不会上传/);
+  assert.match(html, /data-testid="custom-scene-input"/);
   assert.match(html, /aria-label="选择音色"/);
   assert.doesNotMatch(html, /<select\b/i);
   assert.match(html, /钢丝弦吉他/);
@@ -84,7 +88,7 @@ test("server-renders the immersive six-range piano", async () => {
   assert.match(html, /节奏练习/);
   assert.match(html, /data-testid="metronome-toggle"/);
   assert.match(html, /id="metronome-tempo"/);
-  assert.match(html, /A–B 片段循环/);
+  assert.match(html, /A-B 片段循环/);
   assert.doesNotMatch(html, /你离开的事实|Call of Silence/);
   assert.match(html, /LEFT ALT/);
   assert.match(html, /data-testid="articulation-mode">短音/);
@@ -224,19 +228,41 @@ test("dynamic scenes use optimized muted ping-pong videos and independent seamle
   assert.match(source, /ambientPreferenceRef\.current === "auto"/);
   assert.match(source, /void playAmbientScene\(sceneRef\.current\)/);
   assert.match(source, /matchMedia\("\(prefers-reduced-motion: reduce\)"\)/);
-  assert.match(source, /readyVideoScene === scene/);
+  assert.match(source, /readyVideoScene === displayedSceneId/);
   assert.doesNotMatch(styles, /\.scene-video-stack/);
   assert.match(styles, /\.scene-video \{[\s\S]*object-fit: cover[\s\S]*transition: opacity 520ms ease/);
-  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.scene-video \{ display: none; \}/);
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.scene-video:not\(\.custom-scene-video\) \{ display: none; \}/);
+});
+
+test("custom windows stay local, validate media and release object URLs", async () => {
+  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const customScene = await readFile(new URL("../app/custom-scene.mjs", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+
+  assert.match(source, /accept="image\/jpeg,image\/png,image\/webp,image\/avif,video\/mp4,video\/webm,video\/quicktime,\.mov"/);
+  assert.match(source, /validateCustomSceneFile\(file\)/);
+  assert.match(source, /URL\.createObjectURL\(file\)/);
+  assert.match(source, /URL\.revokeObjectURL\(previous\.url\)/);
+  assert.match(source, /customSceneActive \? "custom" : scene/);
+  assert.match(source, /customSceneActive \? undefined : selectedScene\.image/);
+  assert.match(source, /autoPlay=\{videoEnabled\}[\s\S]*loop[\s\S]*muted[\s\S]*playsInline/);
+  assert.doesNotMatch(source.slice(source.indexOf("const handleCustomSceneFile"), source.indexOf("const removeCustomScene")), /fetch\(|FormData|XMLHttpRequest/);
+  assert.match(customScene, /20 \* 1024 \* 1024/);
+  assert.match(customScene, /200 \* 1024 \* 1024/);
+  assert.match(styles, /\.app-shell\[data-scene="custom"\]/);
+  assert.match(styles, /\.scene-video:not\(\.custom-scene-video\)/);
 });
 
 test("immersive mode suppresses non-piano keyboard events", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   assert.match(source, /if \(immersiveModeRef\.current\)/);
   assert.match(source, /event\.stopImmediatePropagation\(\)/);
   assert.match(source, /IMMERSIVE_CONTROL_CODES = new Set\(\["Space", "AltLeft", "NumpadAdd"\]\)/);
   assert.match(source, /!KEY_BY_CODE\.has\(event\.code\) && !IMMERSIVE_CONTROL_CODES\.has\(event\.code\)/);
   assert.match(source, /navigator as KeyboardLockNavigator/);
+  assert.doesNotMatch(styles, /\.immersive\.playing\s+\.brand-lockup[^}]*opacity/i);
+  assert.doesNotMatch(styles, /\.immersive\.playing\s+\.audio-cluster[^}]*opacity/i);
 });
 
 test("navigation and numpad keys map the switchable C1 and C6 range", async () => {
@@ -337,4 +363,23 @@ test("all note particles share the scene's full rise height", async () => {
   assert.match(source, /const rise = Math\.max\(layer\.clientHeight - 18, 280\)/);
   assert.match(source, /setProperty\("--spark-rise", `\$\{rise\}px`\)/);
   assert.doesNotMatch(source, /key\.group.*--spark-rise|--spark-rise.*key\.group/);
+});
+
+test("manual note feedback uses harmonious scene-specific bright palettes", async () => {
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+
+  assert.match(css, /--note-center:\s*#f9feff/i);
+  assert.match(css, /--note-mid:\s*#73dcff/i);
+  assert.match(css, /--note-edge:\s*#b8f2ff/i);
+  assert.match(css, /--note-outline:\s*234, 252, 255/i);
+  assert.match(css, /data-scene="forest"[\s\S]*--note-mid:\s*#b9f58d/i);
+  assert.match(css, /data-scene="rain"[\s\S]*--note-mid:\s*#ffd96b/i);
+  assert.match(css, /data-scene="stars"[\s\S]*--note-mid:\s*#71efd3/i);
+  assert.match(css, /\.note-spark\s*\{[\s\S]*var\(--note-mid\)[\s\S]*var\(--note-outline\)/i);
+  assert.match(css, /\.piano-key\.white\.active[\s\S]*rgba\(var\(--note-glow\)/i);
+  assert.match(css, /\.note-spark\.auto-spark[\s\S]*#e1e9f0/i);
+  assert.match(css, /\.piano-key\.white\.auto-active[\s\S]*#e8edf1/i);
+  assert.doesNotMatch(css, /--note-edge:\s*#2e9fd0/i);
+  assert.doesNotMatch(css, /--note-outline:\s*5, 24, 38/i);
+  assert.doesNotMatch(css, /\.piano-key\.(?:white|black)\.active\.auto-active[^}]+#ffd76e/i);
 });
