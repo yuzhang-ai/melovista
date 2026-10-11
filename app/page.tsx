@@ -14,6 +14,7 @@ import {
   watchMidiAccess,
 } from "./midi-input.mjs";
 import { validateCustomSceneFile } from "./custom-scene.mjs";
+import { DANDELION_SEED_VARIANTS, dandelionSeedDataUri, parseFilmOptions } from "./film-mode.mjs";
 
 type KeyDefinition = {
   code: string;
@@ -410,6 +411,9 @@ const UI_COPY = {
     githubCredit: "在 GitHub 查看琴窗开源项目",
     waitingSource: "等待加载原声音源",
     languageChanged: "已切换至中文界面",
+    filmView: "录制视图",
+    filmStart: "点击开始",
+    filmHint: "← → 切换窗景 · Space 切换低音区",
   },
   en: {
     brand: "MeloVista",
@@ -563,6 +567,9 @@ const UI_COPY = {
     githubCredit: "View MeloVista on GitHub",
     waitingSource: "Load the current sound source to begin",
     languageChanged: "English interface enabled",
+    filmView: "Film view",
+    filmStart: "Click to begin",
+    filmHint: "← → switch window · Space switches low register",
   },
 } as const;
 
@@ -963,7 +970,9 @@ export default function Home() {
   const immersiveModeRef = useRef(false);
   const fullscreenEnteredRef = useRef(false);
   const measurementsRef = useRef<number[]>([]);
+  const filmModeRef = useRef(false);
 
+  const [filmMode, setFilmMode] = useState(false);
   const [isAudioReady, setIsAudioReady] = useState(false);
   const [audioStatus, setAudioStatus] = useState<AudioStatus>("idle");
   const [sampleProgress, setSampleProgress] = useState(0);
@@ -1088,7 +1097,51 @@ export default function Home() {
     while (layer.childElementCount > 180) layer.firstElementChild?.remove();
   }, []);
 
+  const emitDandelionSeeds = useCallback((midi: number, automatic = false) => {
+    const layer = particleLayerRef.current;
+    const key = layer?.closest(".instrument-stage")?.querySelector<HTMLElement>(`.piano-shell [data-midi="${midi}"]`);
+    if (!layer || !key) return;
+    const layerBox = layer.getBoundingClientRect();
+    const keyBox = key.getBoundingClientRect();
+    const x = keyBox.left + keyBox.width / 2 - layerBox.left;
+    const scale = layerBox.width / 600;
+
+    const puff = document.createElement("i");
+    puff.className = "seed-puff";
+    puff.style.left = `${x}px`;
+    puff.addEventListener("animationend", () => puff.remove(), { once: true });
+    layer.appendChild(puff);
+
+    const count = automatic ? 1 : 2 + (Math.random() < 0.35 ? 1 : 0);
+    Array.from({ length: count }).forEach((_, index) => {
+      const seed = document.createElement("i");
+      const tuft = document.createElement("b");
+      const sway = 1.7 + Math.random() * 1.1;
+      const near = !automatic && Math.random() < 0.14;
+      seed.className = `dandelion-seed seed-v${Math.floor(Math.random() * DANDELION_SEED_VARIANTS)} ${near ? "seed-near" : ""}`;
+      seed.style.left = `${x + (Math.random() - 0.5) * 14 * scale}px`;
+      seed.style.setProperty("--seed-size", `${(38 + Math.random() * 26) * (near ? 1.7 : 1) * scale}px`);
+      seed.style.setProperty("--seed-rise", `${layerBox.height * (0.78 + Math.random() * 0.6)}px`);
+      seed.style.setProperty("--seed-drift", `${(-50 + Math.random() * 190) * scale}px`);
+      seed.style.setProperty("--seed-tilt", `${-18 + Math.random() * 36}deg`);
+      seed.style.setProperty("--seed-duration", `${5.6 + Math.random() * 3}s`);
+      seed.style.setProperty("--seed-delay", `${index * 90}ms`);
+      tuft.style.setProperty("--seed-sway", `${sway}s`);
+      tuft.style.setProperty("--seed-phase", `${-Math.random() * sway}s`);
+      tuft.style.setProperty("--seed-sway-x", `${(5 + Math.random() * 8) * scale}px`);
+      seed.appendChild(tuft);
+      seed.addEventListener("animationend", (event) => { if (event.target === seed) seed.remove(); });
+      layer.appendChild(seed);
+    });
+
+    while (layer.childElementCount > 170) layer.firstElementChild?.remove();
+  }, []);
+
   const spawnMidiNoteLight = useCallback((midi: number, automatic = false) => {
+    if (filmModeRef.current) {
+      emitDandelionSeeds(midi, automatic);
+      return;
+    }
     const octave = Math.floor(midi / 12) - 1;
     if (octave < 1 || octave > 6) return;
     const semitone = midi % 12;
@@ -1096,7 +1149,7 @@ export default function Home() {
       ? (BLACK_KEY_BOUNDARY.get(semitone) ?? 0) / 7
       : ((WHITE_KEY_INDEX.get(semitone) ?? 0) + 0.5) / 7;
     emitNoteLight((((octave - 1) + localX) / 6) * 100, automatic);
-  }, [emitNoteLight]);
+  }, [emitDandelionSeeds, emitNoteLight]);
 
   const startMidiVoice = useCallback((code: string, midi: number, eventStartedAt: number, noteLabel: string, velocity = 1) => {
     const context = audioContextRef.current;
@@ -2129,7 +2182,7 @@ export default function Home() {
     setCustomSceneActive(false);
     setCustomSceneError("");
     setOpenMenu(null);
-    particleLayerRef.current?.replaceChildren();
+    if (!filmModeRef.current) particleLayerRef.current?.replaceChildren();
     setLastNote(currentLocale === "zh"
       ? `已进入${option.label.zh} · ${option.detail.zh}`
       : `Entered ${option.label.en} · ${option.detail.en}`);
@@ -2235,6 +2288,19 @@ export default function Home() {
     }, 0);
     return () => window.clearTimeout(localeTimer);
   }, []);
+
+  useEffect(() => {
+    const options = parseFilmOptions(window.location.search);
+    if (!options.enabled) return;
+    const filmTimer = window.setTimeout(() => {
+      filmModeRef.current = true;
+      lowOctaveRef.current = 3;
+      setLowOctave(3);
+      setFilmMode(true);
+      selectScene(options.scene as SceneId);
+    }, 0);
+    return () => window.clearTimeout(filmTimer);
+  }, [selectScene]);
 
   useEffect(() => {
     document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
@@ -2387,6 +2453,15 @@ export default function Home() {
         return;
       }
 
+      if (filmModeRef.current && (event.code === "ArrowLeft" || event.code === "ArrowRight")) {
+        event.preventDefault();
+        if (event.repeat) return;
+        const index = SCENE_OPTIONS.findIndex((option) => option.id === sceneRef.current);
+        const step = event.code === "ArrowRight" ? 1 : -1;
+        selectScene(SCENE_OPTIONS[(index + step + SCENE_OPTIONS.length) % SCENE_OPTIONS.length].id);
+        return;
+      }
+
       const key = KEY_BY_CODE.get(event.code);
       if (!key) return;
       event.preventDefault();
@@ -2454,8 +2529,11 @@ export default function Home() {
       (navigator as KeyboardLockNavigator).keyboard?.unlock?.();
       releaseAll(0.05);
     };
-  }, [releaseAll, releaseVoice, startVoice, stopMetronome, toggleArticulation]);
+  }, [releaseAll, releaseVoice, selectScene, startVoice, stopMetronome, toggleArticulation]);
 
+  const filmSeedStyle = useMemo(() => filmMode
+    ? Object.fromEntries(Array.from({ length: DANDELION_SEED_VARIANTS }, (_, index) => [`--seed-image-${index}`, dandelionSeedDataUri(index)])) as React.CSSProperties
+    : undefined, [filmMode]);
   const activeCodeSet = useMemo(() => activeCodes, [activeCodes]);
   const liveManualMidis = useMemo(() => new Set([...pointerMidis, ...midiDeviceMidis]), [midiDeviceMidis, pointerMidis]);
   const filteredLocalSongs = useMemo(() => {
@@ -2513,7 +2591,7 @@ export default function Home() {
             : (locale === "zh" ? `加载并启动${selectedTimbreLabel}` : `Load & start ${selectedTimbreLabel}`);
 
   return (
-    <main className={`app-shell sunroom ${immersiveMode ? "immersive" : ""} ${activeCodes.size || liveManualMidis.size ? "playing" : ""}`} data-scene={displayedSceneId} data-locale={locale}>
+    <main className={`app-shell sunroom ${immersiveMode ? "immersive" : ""} ${activeCodes.size || liveManualMidis.size ? "playing" : ""} ${filmMode ? "film" : ""} ${filmMode && audioStatus === "running" ? "film-live" : ""}`} data-scene={displayedSceneId} data-locale={locale} style={filmSeedStyle}>
       <div className="scene-background" key={`poster-${displayedSceneId}-${displayedBackground}`} style={{ backgroundImage: `url(${displayedBackground})` }} aria-hidden="true" />
       {shouldRenderSceneVideo && (
         <video
@@ -2907,12 +2985,12 @@ export default function Home() {
               onPointerCancel={handlePianoPointerEnd}
               onLostPointerCapture={handlePianoPointerEnd}
             >
-              <PianoOctave title={copy.extendedRange} octave={1} keys={EXTREME_KEYS} activeCodes={activeCodeSet} activeMidis={liveManualMidis} enabled={extremeOctave === 1} locale={locale} autoMidis={autoMidis} />
-              <PianoOctave title={copy.lowRange} octave={2} keys={LOW_KEYS} activeCodes={activeCodeSet} activeMidis={liveManualMidis} enabled={lowOctave === 2} locale={locale} autoMidis={autoMidis} />
-              <PianoOctave title={copy.lowRange} octave={3} keys={LOW_KEYS} activeCodes={activeCodeSet} activeMidis={liveManualMidis} enabled={lowOctave === 3} locale={locale} autoMidis={autoMidis} />
+              {!filmMode && <PianoOctave title={copy.extendedRange} octave={1} keys={EXTREME_KEYS} activeCodes={activeCodeSet} activeMidis={liveManualMidis} enabled={extremeOctave === 1} locale={locale} autoMidis={autoMidis} />}
+              {(!filmMode || lowOctave === 2) && <PianoOctave title={copy.lowRange} octave={2} keys={LOW_KEYS} activeCodes={activeCodeSet} activeMidis={liveManualMidis} enabled={lowOctave === 2} locale={locale} autoMidis={autoMidis} />}
+              {(!filmMode || lowOctave === 3) && <PianoOctave title={copy.lowRange} octave={3} keys={LOW_KEYS} activeCodes={activeCodeSet} activeMidis={liveManualMidis} enabled={lowOctave === 3} locale={locale} autoMidis={autoMidis} />}
               <PianoOctave title={copy.midRange} octave={4} keys={MID_KEYS} activeCodes={activeCodeSet} activeMidis={liveManualMidis} locale={locale} autoMidis={autoMidis} />
               <PianoOctave title={copy.highRange} octave={5} keys={HIGH_KEYS} activeCodes={activeCodeSet} activeMidis={liveManualMidis} locale={locale} autoMidis={autoMidis} />
-              <PianoOctave title={copy.extendedRange} octave={6} keys={EXTREME_KEYS} activeCodes={activeCodeSet} activeMidis={liveManualMidis} enabled={extremeOctave === 6} locale={locale} autoMidis={autoMidis} />
+              {!filmMode && <PianoOctave title={copy.extendedRange} octave={6} keys={EXTREME_KEYS} activeCodes={activeCodeSet} activeMidis={liveManualMidis} enabled={extremeOctave === 6} locale={locale} autoMidis={autoMidis} />}
             </div>
           </div>
         </div>
@@ -2930,6 +3008,16 @@ export default function Home() {
           <strong>GitHub</strong><span>yuzhang-ai / melovista</span><b aria-hidden="true">↗</b>
         </a>
       </footer>
+
+      {filmMode && audioStatus !== "running" && (
+        <button className="film-start" type="button" onClick={initializeAudio} disabled={audioStatus === "loading"} data-testid="film-start">
+          <span>
+            <small>{copy.filmView}</small>
+            <strong>{audioStatus === "idle" ? copy.filmStart : audioButtonText}</strong>
+            <em>{copy.filmHint}</em>
+          </span>
+        </button>
+      )}
     </main>
   );
 }
